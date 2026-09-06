@@ -1,0 +1,18 @@
+# omarchy-keypad — grant the desktop user access to ONE macropad.
+#
+# Scoped to this USB id on purpose. Adding the user to the `input` group would
+# work too and is what most guides say, but that grants read access to every
+# keyboard on the machine, which is a keylogger for anything running as that
+# user. This grants exactly the device the plugin drives and nothing else.
+#
+# TAG+="uaccess" hands the node to whoever is logged in at the seat, so it
+# follows the active session rather than naming a user.
+#
+# The 70- prefix is load-bearing. systemd applies uaccess ACLs from its own
+# 73-seat-late.rules, so a rule numbered above that tags the device after the
+# ACL has already been decided and the tag silently does nothing.
+SUBSYSTEM=="input", ATTRS{idVendor}=="1189", ATTRS{idProduct}=="8840", MODE="0660", TAG+="uaccess"
+
+# The virtual keyboard that presses shortcut bindings. Same uaccess grant, so
+# it too follows the seat. Needs the `uinput` module loaded (see README).
+KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0660", TAG+="uaccess"

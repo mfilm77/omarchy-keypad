@@ -1,0 +1,20 @@
+[Unit]
+Description=omarchy-keypad — macropad control surface
+Documentation=https://github.com/omarchy-keypad
+# Not Requires: the pad may be unplugged at login and plugged in later, and the
+# daemon polls for it rather than failing.
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.config/omarchy/plugins/vlad.keypad/bin/keypadd.py
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=2
+# The daemon runs commands the user chose, so it needs their session, but it
+# has no business writing outside its own config.
+NoNewPrivileges=true
+PrivateTmp=false
+
+[Install]
+WantedBy=graphical-session.target

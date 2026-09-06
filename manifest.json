@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "vlad.keypad",
+  "name": "Keypad",
+  "version": "0.1.0",
+  "author": "Vlad",
+  "license": "MIT",
+  "description": "Turn a cheap USB macropad into a programmable control surface. Draws your pad, and clicking a key or a knob assigns it a command. Layers are done in software, because these pads report the same keycodes on every hardware layer and say nothing when their layer button is pressed.",
+  "kinds": ["service", "bar-widget", "panel"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml",
+    "panel": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Keypad",
+    "description": "Shows which keypad layer is active; click to open the editor.",
+    "category": "Input",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": { "showName": true },
+    "schema": [
+      {
+        "key": "showName",
+        "type": "boolean",
+        "label": "Show layer name",
+        "defaultValue": true,
+        "description": "Show the layer's name next to the icon, not just its number."
+      }
+    ]
+  }
+}

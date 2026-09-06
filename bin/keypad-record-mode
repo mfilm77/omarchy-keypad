@@ -1,0 +1,55 @@
+#!/bin/sh
+# omarchy-keypad — hold the compositor's binds while a shortcut is recorded.
+#
+# Hyprland runs its binds BEFORE a key reaches any window, and a consumed key
+# never arrives at all. So an editor that says "press the shortcut" would see
+# SUPER go down and then nothing, because SUPER+1 had already switched
+# workspace. The fix is a submap: while one is active only its own binds
+# exist, so every chord falls through to the focused window — our panel.
+#
+# The submap is registered at runtime the first time it is needed, so nothing
+# has to be added to the user's Hyprland config. It carries one deliberately
+# unreachable bind, because a submap with no binds cannot be entered. It is
+# idempotent: a second registration is skipped.
+#
+# Hyprland 0.56+ with a Lua config takes Lua expressions here; the legacy
+# forms are tried second for older setups.
+#
+#   keypad-record-mode start   — enter the submap
+#   keypad-record-mode stop    — back to normal binds
+set -u
+
+SUBMAP="omarchy-keypad-record"
+
+registered() {
+  hyprctl binds 2>/dev/null | grep -q "submap: $SUBMAP"
+}
+
+register() {
+  hyprctl eval "hl.define_submap(\"$SUBMAP\", function() hl.bind(\"SUPER + CTRL + ALT + SHIFT + F24\", hl.dsp.submap(\"reset\"), { locked = true }) end)" >/dev/null 2>&1 \
+  || hyprctl --batch "keyword submap $SUBMAP ; keyword bindl SUPER CTRL ALT SHIFT, F24, submap, reset ; keyword submap reset" >/dev/null 2>&1
+}
+
+enter() {
+  hyprctl dispatch "hl.dsp.submap(\"$SUBMAP\")" >/dev/null 2>&1 \
+  || hyprctl dispatch submap "$SUBMAP" >/dev/null 2>&1
+}
+
+leave() {
+  hyprctl dispatch 'hl.dsp.submap("reset")' >/dev/null 2>&1 \
+  || hyprctl dispatch submap reset >/dev/null 2>&1
+}
+
+case "${1:-}" in
+  start)
+    registered || register
+    enter
+    ;;
+  stop)
+    leave
+    ;;
+  *)
+    echo "usage: $0 start|stop" >&2
+    exit 2
+    ;;
+esac
