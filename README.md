@@ -3,7 +3,10 @@
 Turns a cheap USB macropad into a programmable control surface on Omarchy.
 
 Built for a 12-key, 2-knob pad (USB `1189:8840`, sold as a "Sikai" pad), but the
-device id is in the config so any pad that reports plain keycodes will work.
+device identity is in the config so any pad that reports plain keycodes will
+work. The pad is matched on any bus: plugged in over USB, or paired over
+Bluetooth, where it shows up as `MINI_KEYBOARD` with a borrowed Apple id
+(`05ac:022c`). Both can be live at once; each is grabbed.
 
 ## Why it exists
 
@@ -94,6 +97,16 @@ A binding in `config.json` is one of:
 { "type": "shortcut", "label": "Undo", "keys": "CTRL + Z", "codes": [29, 44] }
 { "type": "layer",    "label": "Next layer" }
 { "type": "layer",    "label": "Resolve keys", "to": 1 }
+```
+
+`devices` lists what to grab; each entry is any subset of `bus` (`usb` or
+`bluetooth`), `vendor`, `product`, `name`, `uniq` (the Bluetooth address):
+
+```json
+"devices": [
+  { "bus": "usb", "vendor": "1189", "product": "8840" },
+  { "bus": "bluetooth", "name": "MINI_KEYBOARD", "vendor": "05ac", "product": "022c" }
+]
 ```
 
 `codes` are Linux evdev keycodes, pressed in that order and released in

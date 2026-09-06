@@ -1,16 +1,59 @@
 {
-  "device": { "vendor": "1189", "product": "8840" },
+  "devices": [
+    {
+      "bus": "usb",
+      "vendor": "1189",
+      "product": "8840"
+    },
+    {
+      "bus": "bluetooth",
+      "name": "MINI_KEYBOARD",
+      "vendor": "05ac",
+      "product": "022c"
+    }
+  ],
   "layers": [
     {
       "name": "Main",
       "bindings": {
-        "knob1_left":   { "type": "command", "label": "Volume down", "run": "omarchy-audio-output-volume lower" },
-        "knob1_right":  { "type": "command", "label": "Volume up",   "run": "omarchy-audio-output-volume raise" },
-        "knob1_press":  { "type": "command", "label": "Mute",        "run": "omarchy-audio-output-volume mute-toggle" },
-        "knob2_press":  { "type": "layer",   "label": "Next layer" }
+        "knob1_left": {
+          "type": "command",
+          "label": "Volume down",
+          "run": "omarchy-audio-output-volume lower"
+        },
+        "knob1_right": {
+          "type": "command",
+          "label": "Volume up",
+          "run": "omarchy-audio-output-volume raise"
+        },
+        "knob1_press": {
+          "type": "command",
+          "label": "Mute",
+          "run": "omarchy-audio-output-volume mute-toggle"
+        },
+        "knob2_press": {
+          "type": "layer",
+          "label": "Next layer"
+        }
       }
     },
-    { "name": "Two",   "bindings": { "knob2_press": { "type": "layer", "label": "Next layer" } } },
-    { "name": "Three", "bindings": { "knob2_press": { "type": "layer", "label": "Next layer" } } }
+    {
+      "name": "Two",
+      "bindings": {
+        "knob2_press": {
+          "type": "layer",
+          "label": "Next layer"
+        }
+      }
+    },
+    {
+      "name": "Three",
+      "bindings": {
+        "knob2_press": {
+          "type": "layer",
+          "label": "Next layer"
+        }
+      }
+    }
   ]
 }

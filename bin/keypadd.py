@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """omarchy-keypad — turn a cheap USB macropad into a programmable control surface.
 
-Runs as the desktop user, not root. A udev rule grants access to one device by
-its USB id, so nothing here can read any other keyboard.
+Runs as the desktop user, not root. A udev rule grants access to the pad by its
+identity — USB id, or name + id over Bluetooth — so nothing here can read any
+other keyboard.
 
 The pad is grabbed EXCLUSIVELY. That is what stops its keys typing letters into
 whatever has focus, and it is the whole reason this exists rather than a set of
@@ -20,6 +21,7 @@ the user's own keymap and every bind fires as if a real key had been pressed.
 
 import errno
 import fcntl
+import glob
 import json
 import os
 import select
@@ -33,6 +35,8 @@ EVENT_FMT = "llHHi"
 EVENT_SIZE = struct.calcsize(EVENT_FMT)
 EV_SYN = 0x00
 EV_KEY = 0x01
+EV_REL = 0x02
+EV_ABS = 0x03
 SYN_REPORT = 0
 EVIOCGRAB = 0x40044590
 
@@ -66,34 +70,66 @@ def log(msg):
     print("keypadd: %s" % msg, flush=True)
 
 
-def find_device(vendor, product):
-    """Locate the pad's event node by USB id.
+BUS_NAMES = {"0003": "usb", "0005": "bluetooth"}
 
-    Matched through /sys rather than by name: the product string on these pads
-    is the generic "USB Composite Device", which several unrelated things also
-    claim, and the event number changes on every replug.
+
+def list_input_devices():
+    """Every event node with its identity, read from sysfs.
+
+    Looked up through /sys/class/input rather than /sys/bus/usb so the same
+    pad is found whether it is plugged in or paired: over Bluetooth it is a
+    uhid device with no USB ancestry at all, and a different vendor/product
+    (this pad claims Apple's 05ac:022c over the air).
     """
-    base = "/sys/bus/usb/devices"
-    for entry in sorted(os.listdir(base)):
-        path = os.path.join(base, entry)
-        try:
-            with open(os.path.join(path, "idVendor")) as f:
-                if f.read().strip().lower() != vendor.lower():
-                    continue
-            with open(os.path.join(path, "idProduct")) as f:
-                if f.read().strip().lower() != product.lower():
-                    continue
-        except OSError:
-            continue
-        for root, dirs, _files in os.walk(path):
-            for d in dirs:
-                if d.startswith("event"):
-                    node = "/dev/input/" + d
-                    # The pad presents a keyboard and a mouse interface on the
-                    # same id. Only the one that reports keys is ours.
-                    if device_has_keys(node):
-                        return node
-    return None
+    out = []
+    for d in sorted(glob.glob("/sys/class/input/event*")):
+        dev = os.path.join(d, "device")
+
+        def rd(rel):
+            try:
+                with open(os.path.join(dev, rel)) as f:
+                    return f.read().strip()
+            except OSError:
+                return ""
+
+        out.append({
+            "node": "/dev/input/" + os.path.basename(d),
+            "bustype": rd("id/bustype"),
+            "vendor": rd("id/vendor"),
+            "product": rd("id/product"),
+            "name": rd("name"),
+            "uniq": rd("uniq"),
+        })
+    return out
+
+
+def matches(info, spec):
+    """A device spec is any subset of vendor, product, name, bus, uniq."""
+    for key in ("vendor", "product", "uniq"):
+        want = spec.get(key)
+        if want and info[key].lower() != str(want).lower():
+            return False
+    if spec.get("name") and info["name"] != spec["name"]:
+        return False
+    if spec.get("bus"):
+        bus = BUS_NAMES.get(info["bustype"], info["bustype"])
+        if bus != spec["bus"]:
+            return False
+    return True
+
+
+def find_devices(specs):
+    """All event nodes matching any spec that actually report the pad keys.
+
+    A pad may present a keyboard and a mouse interface on the same id (USB),
+    or one combined node (Bluetooth); only nodes that emit the keys count.
+    """
+    nodes = []
+    for info in list_input_devices():
+        if any(matches(info, spec) for spec in specs):
+            if device_has_keys(info["node"]):
+                nodes.append(info["node"])
+    return nodes
 
 
 def device_has_keys(node):
@@ -127,6 +163,14 @@ def load_config():
     except (OSError, ValueError) as e:
         log("config unreadable, ignoring it: %s" % e)
         return {"device": {"vendor": "1189", "product": "8840"}, "layers": []}
+
+
+def device_specs(config):
+    """`devices` is a list of matchers; the older single `device` still works."""
+    specs = config.get("devices")
+    if not specs:
+        specs = [config.get("device") or {"vendor": "1189", "product": "8840"}]
+    return [s for s in specs if isinstance(s, dict)]
 
 
 def write_state(layer_index, layers):
@@ -274,8 +318,9 @@ class Daemon:
     def __init__(self):
         self.config = load_config()
         self.layer = 0
-        self.fd = None
-        self.node = None
+        self.fds = {}          # node -> fd, every grabbed pad (USB and/or Bluetooth)
+        self.last_scan = 0.0
+        self.seen_axes = set()
         self.running = True
         self.keyboard = VirtualKeyboard()
 
@@ -289,52 +334,58 @@ class Daemon:
         layer = layers[self.layer % len(layers)]
         return (layer.get("bindings") or {}).get(control)
 
-    def open_device(self):
-        dev = self.config.get("device", {})
-        node = find_device(dev.get("vendor", "1189"), dev.get("product", "8840"))
-        if not node:
-            return False
-        try:
-            fd = os.open(node, os.O_RDONLY)
-        except OSError as e:
-            if e.errno in (errno.EACCES, errno.EPERM):
-                log("no permission for %s — is the udev rule installed?" % node)
-            return False
-        try:
-            fcntl.ioctl(fd, EVIOCGRAB, 1)
-        except OSError as e:
-            # Without the grab the pad would still type letters everywhere.
-            # Refusing is honest; half-working would look like a bug later.
-            log("could not grab %s exclusively: %s" % (node, e))
-            os.close(fd)
-            return False
-        self.fd, self.node = fd, node
-        log("grabbed %s (%s)" % (node, dev.get("vendor", "?")))
-        return True
+    def open_devices(self):
+        """Grab every matching pad not already held. Called on a 2 s cadence
+        so a pad plugged in or paired later just starts working."""
+        self.last_scan = time.time()
+        for node in find_devices(device_specs(self.config)):
+            if node in self.fds:
+                continue
+            try:
+                fd = os.open(node, os.O_RDONLY)
+            except OSError as e:
+                if e.errno in (errno.EACCES, errno.EPERM):
+                    log("no permission for %s — is the udev rule installed?" % node)
+                continue
+            try:
+                fcntl.ioctl(fd, EVIOCGRAB, 1)
+            except OSError as e:
+                # Without the grab the pad would still type letters everywhere.
+                # Refusing is honest; half-working would look like a bug later.
+                log("could not grab %s exclusively: %s" % (node, e))
+                os.close(fd)
+                continue
+            self.fds[node] = fd
+            log("grabbed %s" % node)
 
-    def close_device(self):
-        if self.fd is None:
+    def close_device(self, node):
+        fd = self.fds.pop(node, None)
+        if fd is None:
             return
         try:
-            fcntl.ioctl(self.fd, EVIOCGRAB, 0)
+            fcntl.ioctl(fd, EVIOCGRAB, 0)
         except OSError:
             pass
         try:
-            os.close(self.fd)
+            os.close(fd)
         except OSError:
             pass
-        self.fd, self.node = None, None
 
     def handle(self, code, value):
         if value != 1:  # presses only; releases and autorepeat are not actions
             return
         control = KEYCODES.get(code)
         if not control:
+            # Logged so a pad that speaks differently on another bus can be
+            # mapped from the journal instead of guessed at.
+            log("unmapped keycode %d" % code)
             return
         action = self.binding(control)
         if not action:
+            log("%s pressed — no binding on layer %d" % (control, self.layer))
             return
         kind = action.get("type", "command")
+        log("%s pressed -> %s %r" % (control, kind, action.get("label", "")))
         if kind == "layer":
             layers = self.layers()
             if layers:
@@ -375,35 +426,40 @@ class Daemon:
         # cannot open yet it is retried on first use.
         self.keyboard.open()
         while self.running:
-            if self.fd is None:
-                if not self.open_device():
-                    # Unplugged, or the rule is not in place yet. Poll rather
-                    # than exit: a pad plugged in later should just start working.
+            if not self.fds or time.time() - self.last_scan > 2.0:
+                self.open_devices()
+                if not self.fds:
+                    # Unplugged, not paired, or the rule is not in place yet.
                     time.sleep(2.0)
                     continue
             try:
-                r, _, _ = select.select([self.fd], [], [], 0.5)
+                r, _, _ = select.select(list(self.fds.values()), [], [], 0.5)
             except (OSError, ValueError):
-                self.close_device()
+                for node in list(self.fds):
+                    self.close_device(node)
                 continue
-            if not r:
-                continue
-            try:
-                data = os.read(self.fd, EVENT_SIZE * 64)
-            except OSError:
-                log("device went away")
-                self.close_device()
-                continue
-            if not data:
-                self.close_device()
-                continue
-            for i in range(0, len(data) - EVENT_SIZE + 1, EVENT_SIZE):
-                _, _, etype, code, value = struct.unpack(
-                    EVENT_FMT, data[i:i + EVENT_SIZE]
-                )
-                if etype == EV_KEY:
-                    self.handle(code, value)
-        self.close_device()
+            for fd in r:
+                node = next((n for n, f in self.fds.items() if f == fd), None)
+                try:
+                    data = os.read(fd, EVENT_SIZE * 64)
+                except OSError:
+                    log("%s went away" % node)
+                    self.close_device(node)
+                    continue
+                if not data:
+                    self.close_device(node)
+                    continue
+                for i in range(0, len(data) - EVENT_SIZE + 1, EVENT_SIZE):
+                    _, _, etype, code, value = struct.unpack(
+                        EVENT_FMT, data[i:i + EVENT_SIZE]
+                    )
+                    if etype == EV_KEY:
+                        self.handle(code, value)
+                    elif etype in (EV_REL, EV_ABS) and (etype, code) not in self.seen_axes:
+                        self.seen_axes.add((etype, code))
+                        log("pad sends axis events type=%d code=%d (not mapped)" % (etype, code))
+        for node in list(self.fds):
+            self.close_device(node)
         self.keyboard.close()
         log("stopped")
 

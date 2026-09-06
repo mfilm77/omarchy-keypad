@@ -16,3 +16,8 @@ SUBSYSTEM=="input", ATTRS{idVendor}=="1189", ATTRS{idProduct}=="8840", MODE="066
 # The virtual keyboard that presses shortcut bindings. Same uaccess grant, so
 # it too follows the seat. Needs the `uinput` module loaded (see README).
 KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0660", TAG+="uaccess"
+
+# The same pad over Bluetooth. It arrives as a uhid device with no USB ancestry
+# and a borrowed Apple id (05ac:022c), so it is matched by name + id on the
+# input device itself. Adjust the name if your pad advertises another one.
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="MINI_KEYBOARD", ATTRS{id/vendor}=="05ac", ATTRS{id/product}=="022c", MODE="0660", TAG+="uaccess"
