@@ -317,7 +317,12 @@ PanelWindow {
                 }
               }
               Text {
-                text: modelData.glyph + " " + modelData.label
+                text: {
+                  var t = modelData.glyph + " " + modelData.label
+                  if (on && modelData.key === "bluetooth" && root.service.bluetoothBattery >= 0)
+                    t += " · " + root.service.bluetoothBattery + "%"
+                  return t
+                }
                 color: on ? Color.foreground : Qt.darker(Color.foreground, 1.8)
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption

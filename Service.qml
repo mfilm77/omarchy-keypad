@@ -34,6 +34,14 @@ Item {
   readonly property bool usbConnected: connections.some(function (d) { return d.bus === "usb" })
   readonly property bool bluetoothConnected: connections.some(function (d) { return d.bus === "bluetooth" })
   readonly property bool padConnected: connections.length > 0
+  // Battery of the Bluetooth pad, -1 when unknown or not on Bluetooth.
+  readonly property int bluetoothBattery: {
+    for (var i = 0; i < connections.length; i++) {
+      var d = connections[i]
+      if (d.bus === "bluetooth" && typeof d.battery === "number") return d.battery
+    }
+    return -1
+  }
 
   readonly property var layers: config && config.layers ? config.layers : []
 

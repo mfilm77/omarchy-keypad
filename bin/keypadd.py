@@ -129,8 +129,36 @@ def find_devices(specs):
         if any(matches(info, spec) for spec in specs):
             if device_has_keys(info["node"]):
                 bus = BUS_NAMES.get(info["bustype"], info["bustype"] or "unknown")
-                found.append((info["node"], bus))
+                found.append((info["node"], bus, info["uniq"]))
     return found
+
+
+def bluetooth_battery(address):
+    """Battery percentage of a paired device, via BlueZ, or None.
+
+    The pad advertises the standard Battery Service and BlueZ exposes it, but
+    the kernel does not create a power_supply for it, so `bluetoothctl info`
+    is the one place the number exists on this box.
+    """
+    if not address:
+        return None
+    try:
+        out = subprocess.run(
+            ["bluetoothctl", "info", address],
+            capture_output=True, text=True, timeout=5,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith("Battery Percentage:"):
+            # "Battery Percentage: 0x64 (100)"
+            inside = line[line.rfind("(") + 1:line.rfind(")")]
+            try:
+                return int(inside)
+            except ValueError:
+                return None
+    return None
 
 
 def device_has_keys(node):
@@ -174,7 +202,7 @@ def device_specs(config):
     return [s for s in specs if isinstance(s, dict)]
 
 
-def write_state(layer_index, layers, devices=None):
+def write_state(layer_index, layers, devices=None, battery=None):
     """Publish the current layer and which pads are held, so the bar widget
     can show the layer and the panel can light a USB or Bluetooth indicator.
 
@@ -186,7 +214,10 @@ def write_state(layer_index, layers, devices=None):
         name = layers[layer_index].get("name", "")
     payload = {
         "layer": layer_index, "name": name, "count": len(layers),
-        "devices": [{"node": n, "bus": b} for n, b in sorted((devices or {}).items())],
+        "devices": [
+            {"node": n, "bus": b, "battery": (battery or {}).get(n)}
+            for n, b in sorted((devices or {}).items())
+        ],
     }
     tmp = STATE + ".tmp"
     try:
@@ -359,6 +390,9 @@ class Daemon:
         self.layer = 0
         self.fds = {}          # node -> fd, every grabbed pad (USB and/or Bluetooth)
         self.buses = {}        # node -> "usb" | "bluetooth", for the indicators
+        self.addresses = {}    # node -> Bluetooth address, for the battery
+        self.battery = {}      # node -> percent, Bluetooth pads only
+        self.last_battery = 0.0
         self.last_scan = 0.0
         self.seen_axes = set()
         self.running = True
@@ -378,7 +412,7 @@ class Daemon:
         """Grab every matching pad not already held. Called on a 2 s cadence
         so a pad plugged in or paired later just starts working."""
         self.last_scan = time.time()
-        for node, bus in find_devices(device_specs(self.config)):
+        for node, bus, uniq in find_devices(device_specs(self.config)):
             if node in self.fds:
                 continue
             try:
@@ -397,15 +431,35 @@ class Daemon:
                 continue
             self.fds[node] = fd
             self.buses[node] = bus
+            if bus == "bluetooth":
+                self.addresses[node] = uniq
+                self.last_battery = 0.0  # read it now, not in a minute
             log("grabbed %s (%s)" % (node, bus))
             self.publish()
 
     def publish(self):
-        write_state(self.layer, self.layers(), self.buses)
+        write_state(self.layer, self.layers(), self.buses, self.battery)
+
+    def poll_battery(self):
+        """Once a minute, and on connect. bluetoothctl takes a moment, which
+        is fine at this cadence and would not be per keypress."""
+        if time.time() - self.last_battery < 60.0:
+            return
+        self.last_battery = time.time()
+        changed = False
+        for node, address in list(self.addresses.items()):
+            pct = bluetooth_battery(address)
+            if self.battery.get(node) != pct:
+                self.battery[node] = pct
+                changed = True
+        if changed:
+            self.publish()
 
     def close_device(self, node):
         fd = self.fds.pop(node, None)
         self.buses.pop(node, None)
+        self.addresses.pop(node, None)
+        self.battery.pop(node, None)
         if fd is None:
             return
         log("released %s" % node)
@@ -480,6 +534,8 @@ class Daemon:
                     # Unplugged, not paired, or the rule is not in place yet.
                     time.sleep(2.0)
                     continue
+            if self.addresses:
+                self.poll_battery()
             try:
                 r, _, _ = select.select(list(self.fds.values()), [], [], 0.5)
             except (OSError, ValueError):
