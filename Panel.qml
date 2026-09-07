@@ -61,13 +61,11 @@ PanelWindow {
   onLayerIndexChanged: { syncEditor(); syncLayerName() }
   onActionChanged: syncEditor()
 
-  Connections {
-    target: root.service
-    // The service is assigned after creation, so the target is null at first
-    // and QML would warn about the handler having no signal to match.
-    ignoreUnknownSignals: true
-    function onConfigChanged() { root.syncLayerName() }
-  }
+  // Watch the layer list through a binding rather than a Connections element:
+  // the service is assigned after creation, and Connections warns about a
+  // handler with no matching signal while its target is still null.
+  readonly property var layersWatch: service ? service.layers : null
+  onLayersWatchChanged: syncLayerName()
 
   // The fields are set, not bound: a TextField binding breaks the moment the
   // user types, so a bound `text:` would go stale on the next selection.
@@ -290,7 +288,7 @@ PanelWindow {
         // The two lights. One per transport, lit while the daemon holds a
         // pad on it, so "connected" is never a guess.
         Row {
-          spacing: Style.spacing.sm
+          spacing: Style.space(28)
           anchors.verticalCenter: parent.verticalCenter
           Repeater {
             model: [
