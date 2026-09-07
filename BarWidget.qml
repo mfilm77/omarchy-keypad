@@ -23,6 +23,26 @@ BarWidget {
   readonly property int layerIndex: service ? service.activeLayer : 0
   readonly property string layerName: service ? service.activeLayerName : ""
 
+  // Computed in a function with a catch: while the shell reloads a plugin the
+  // service is deleted under a live binding, and QML then reads its
+  // properties as "of null" even past a null check.
+  function tooltip() {
+    try {
+      if (!root.live) {
+        return root.service && root.service.daemonRunning
+          ? "Keypad · no pad connected" : "Keypad · not running"
+      }
+      var b = root.service.bluetoothBattery
+      return "Keypad over " + root.transport
+        + (b >= 0 ? " (battery " + b + "%)" : "")
+        + " · layer " + (root.layerIndex + 1)
+        + (root.layerName ? " (" + root.layerName + ")" : "")
+        + "\nClick to edit what the keys do"
+    } catch (e) {
+      return "Keypad"
+    }
+  }
+
   implicitWidth: button.implicitWidth
   implicitHeight: root.vertical ? button.implicitHeight : root.barSize
 
@@ -43,12 +63,7 @@ BarWidget {
     fontSize: Style.font.body
     horizontalMargin: 6
     verticalPadding: 2
-    tooltipText: root.live
-      ? "Keypad over " + root.transport
-        + (root.service && root.service.bluetoothBattery >= 0 ? " (battery " + root.service.bluetoothBattery + "%)" : "")
-        + " · layer " + (root.layerIndex + 1)
-        + (root.layerName ? " (" + root.layerName + ")" : "") + "\nClick to edit what the keys do"
-      : (root.service && root.service.daemonRunning ? "Keypad · no pad connected" : "Keypad · not running")
+    tooltipText: root.tooltip()
     onPressed: {
       if (!bar || !bar.shell) return
       if (typeof bar.shell.toggle === "function") bar.shell.toggle("vlad.keypad", "{}")
