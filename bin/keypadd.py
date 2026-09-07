@@ -192,6 +192,39 @@ def write_state(layer_index, layers):
         log("could not publish layer state: %s" % e)
 
 
+def session_env():
+    """Our environment plus whatever the compositor session needs.
+
+    The daemon starts in the same second as Hyprland, before uwsm has pushed
+    HYPRLAND_INSTANCE_SIGNATURE and WAYLAND_DISPLAY into the user's systemd
+    environment, so a unit-inherited environment is missing both and every
+    `hyprctl` a binding runs fails silently. Resolved fresh per action from
+    the runtime dir instead: the newest instance dir is the live compositor.
+    """
+    env = dict(os.environ)
+    runtime = env.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
+    env.setdefault("XDG_RUNTIME_DIR", runtime)
+    env.setdefault("DBUS_SESSION_BUS_ADDRESS", "unix:path=%s/bus" % runtime)
+    try:
+        hypr = os.path.join(runtime, "hypr")
+        sigs = sorted(
+            (d for d in os.listdir(hypr) if os.path.isdir(os.path.join(hypr, d))),
+            key=lambda d: os.path.getmtime(os.path.join(hypr, d)),
+        )
+        if sigs:
+            env["HYPRLAND_INSTANCE_SIGNATURE"] = sigs[-1]
+    except OSError:
+        pass
+    if "WAYLAND_DISPLAY" not in env:
+        socks = sorted(
+            f for f in os.listdir(runtime)
+            if f.startswith("wayland-") and not f.endswith(".lock")
+        ) if os.path.isdir(runtime) else []
+        if socks:
+            env["WAYLAND_DISPLAY"] = socks[-1]
+    return env
+
+
 def run_action(action):
     cmd = action.get("run", "").strip()
     if not cmd:
@@ -201,6 +234,7 @@ def run_action(action):
         # this daemon restarts, and start_new_session keeps it off our stdin.
         subprocess.Popen(
             ["/bin/sh", "-c", cmd],
+            env=session_env(),
             start_new_session=True,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
