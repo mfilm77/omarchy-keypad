@@ -94,7 +94,9 @@ Item {
               color: topRow ? "#1A1A1A" : "#F2F2F2"
               font.family: Style.font.family
               font.pixelSize: Math.max(7, root.unit * 0.52 - 2)
-              wrapMode: Text.Wrap
+              // Word boundaries only: a word that does not fit is elided
+              // rather than chopped mid-way.
+              wrapMode: Text.WordWrap
               horizontalAlignment: Text.AlignHCenter
               verticalAlignment: Text.AlignVCenter
               elide: Text.ElideRight
