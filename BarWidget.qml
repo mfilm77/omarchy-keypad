@@ -14,7 +14,10 @@ BarWidget {
   readonly property var service: bar && bar.shell
     ? bar.shell.serviceFor("vlad.keypad") : null
   readonly property bool showName: setting("showName", true)
-  readonly property bool live: service ? service.daemonRunning : false
+  readonly property bool live: service ? (service.daemonRunning && service.padConnected) : false
+  readonly property string transport: service
+    ? [service.usbConnected ? "USB" : "", service.bluetoothConnected ? "Bluetooth" : ""].filter(Boolean).join(" + ")
+    : ""
   // NOT `layer`: Item already has a FINAL property by that name and shadowing
   // it stops the widget loading at all.
   readonly property int layerIndex: service ? service.activeLayer : 0
@@ -41,9 +44,9 @@ BarWidget {
     horizontalMargin: 6
     verticalPadding: 2
     tooltipText: root.live
-      ? "Keypad · layer " + (root.layerIndex + 1) + (root.layerName ? " (" + root.layerName + ")" : "")
-        + "\nClick to edit what the keys do"
-      : "Keypad · not running"
+      ? "Keypad over " + root.transport + " · layer " + (root.layerIndex + 1)
+        + (root.layerName ? " (" + root.layerName + ")" : "") + "\nClick to edit what the keys do"
+      : (root.service && root.service.daemonRunning ? "Keypad · no pad connected" : "Keypad · not running")
     onPressed: {
       if (!bar || !bar.shell) return
       if (typeof bar.shell.toggle === "function") bar.shell.toggle("vlad.keypad", "{}")

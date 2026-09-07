@@ -63,6 +63,9 @@ PanelWindow {
 
   Connections {
     target: root.service
+    // The service is assigned after creation, so the target is null at first
+    // and QML would warn about the handler having no signal to match.
+    ignoreUnknownSignals: true
     function onConfigChanged() { root.syncLayerName() }
   }
 
@@ -258,7 +261,7 @@ PanelWindow {
         spacing: Style.spacing.sm
 
         Column {
-          width: parent.width - Style.space(120)
+          width: parent.width - Style.space(330)
           Text {
             text: "Keypad"
             color: Color.foreground
@@ -267,13 +270,63 @@ PanelWindow {
             font.bold: true
           }
           Text {
-            text: root.service && root.service.daemonRunning
-              ? "Connected · layer " + (root.layerIndex + 1)
-              : "Not running — the pad is not being read"
-            color: root.service && root.service.daemonRunning
+            text: {
+              if (!root.service || !root.service.daemonRunning)
+                return "Not running — the pad is not being read"
+              if (!root.service.padConnected)
+                return "No pad connected — plug it in or pair it"
+              var over = []
+              if (root.service.usbConnected) over.push("USB")
+              if (root.service.bluetoothConnected) over.push("Bluetooth")
+              return "Connected over " + over.join(" + ") + " · layer " + (root.layerIndex + 1)
+            }
+            color: root.service && root.service.daemonRunning && root.service.padConnected
               ? Qt.darker(Color.foreground, 1.4) : Color.urgent
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
+          }
+        }
+
+        // The two lights. One per transport, lit while the daemon holds a
+        // pad on it, so "connected" is never a guess.
+        Row {
+          spacing: Style.spacing.sm
+          anchors.verticalCenter: parent.verticalCenter
+          Repeater {
+            model: [
+              { glyph: "󰕓", label: "USB", key: "usb" },
+              { glyph: "󰂯", label: "Bluetooth", key: "bluetooth" }
+            ]
+            delegate: Row {
+              required property var modelData
+              readonly property bool on: root.service
+                ? (modelData.key === "usb" ? root.service.usbConnected
+                                           : root.service.bluetoothConnected)
+                : false
+              spacing: Style.spacing.xs
+              anchors.verticalCenter: parent.verticalCenter
+              Rectangle {
+                width: Style.space(9); height: width; radius: width / 2
+                anchors.verticalCenter: parent.verticalCenter
+                color: on ? "#3BE06B" : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.18)
+                border.width: 1
+                border.color: on ? Qt.lighter("#3BE06B", 1.3) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.3)
+                Rectangle {
+                  visible: on
+                  anchors.centerIn: parent
+                  width: parent.width * 2.2; height: width; radius: width / 2
+                  color: "#3BE06B"; opacity: 0.18
+                }
+              }
+              Text {
+                text: modelData.glyph + " " + modelData.label
+                color: on ? Color.foreground : Qt.darker(Color.foreground, 1.8)
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+                font.bold: on
+                anchors.verticalCenter: parent.verticalCenter
+              }
+            }
           }
         }
 

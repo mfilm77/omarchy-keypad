@@ -124,12 +124,13 @@ def find_devices(specs):
     A pad may present a keyboard and a mouse interface on the same id (USB),
     or one combined node (Bluetooth); only nodes that emit the keys count.
     """
-    nodes = []
+    found = []
     for info in list_input_devices():
         if any(matches(info, spec) for spec in specs):
             if device_has_keys(info["node"]):
-                nodes.append(info["node"])
-    return nodes
+                bus = BUS_NAMES.get(info["bustype"], info["bustype"] or "unknown")
+                found.append((info["node"], bus))
+    return found
 
 
 def device_has_keys(node):
@@ -173,8 +174,9 @@ def device_specs(config):
     return [s for s in specs if isinstance(s, dict)]
 
 
-def write_state(layer_index, layers):
-    """Publish the current layer so the bar widget can show it.
+def write_state(layer_index, layers, devices=None):
+    """Publish the current layer and which pads are held, so the bar widget
+    can show the layer and the panel can light a USB or Bluetooth indicator.
 
     Written to XDG_RUNTIME_DIR: it is state about this login, not a setting,
     and it must not survive a reboot into a stale value.
@@ -182,7 +184,10 @@ def write_state(layer_index, layers):
     name = ""
     if 0 <= layer_index < len(layers):
         name = layers[layer_index].get("name", "")
-    payload = {"layer": layer_index, "name": name, "count": len(layers)}
+    payload = {
+        "layer": layer_index, "name": name, "count": len(layers),
+        "devices": [{"node": n, "bus": b} for n, b in sorted((devices or {}).items())],
+    }
     tmp = STATE + ".tmp"
     try:
         with open(tmp, "w") as f:
@@ -353,6 +358,7 @@ class Daemon:
         self.config = load_config()
         self.layer = 0
         self.fds = {}          # node -> fd, every grabbed pad (USB and/or Bluetooth)
+        self.buses = {}        # node -> "usb" | "bluetooth", for the indicators
         self.last_scan = 0.0
         self.seen_axes = set()
         self.running = True
@@ -372,7 +378,7 @@ class Daemon:
         """Grab every matching pad not already held. Called on a 2 s cadence
         so a pad plugged in or paired later just starts working."""
         self.last_scan = time.time()
-        for node in find_devices(device_specs(self.config)):
+        for node, bus in find_devices(device_specs(self.config)):
             if node in self.fds:
                 continue
             try:
@@ -390,12 +396,19 @@ class Daemon:
                 os.close(fd)
                 continue
             self.fds[node] = fd
-            log("grabbed %s" % node)
+            self.buses[node] = bus
+            log("grabbed %s (%s)" % (node, bus))
+            self.publish()
+
+    def publish(self):
+        write_state(self.layer, self.layers(), self.buses)
 
     def close_device(self, node):
         fd = self.fds.pop(node, None)
+        self.buses.pop(node, None)
         if fd is None:
             return
+        log("released %s" % node)
         try:
             fcntl.ioctl(fd, EVIOCGRAB, 0)
         except OSError:
@@ -404,6 +417,7 @@ class Daemon:
             os.close(fd)
         except OSError:
             pass
+        self.publish()
 
     def handle(self, code, value):
         if value != 1:  # presses only; releases and autorepeat are not actions
@@ -428,7 +442,7 @@ class Daemon:
                     self.layer = target % len(layers)
                 else:
                     self.layer = (self.layer + 1) % len(layers)
-                write_state(self.layer, layers)
+                self.publish()
                 log("layer -> %d" % self.layer)
         elif kind == "command":
             run_action(action)
@@ -444,7 +458,7 @@ class Daemon:
         layers = self.layers()
         if layers:
             self.layer %= len(layers)
-        write_state(self.layer, layers)
+        self.publish()
         log("config reloaded (%d layers)" % len(layers))
 
     def stop(self, *_):
@@ -454,7 +468,7 @@ class Daemon:
         signal.signal(signal.SIGTERM, self.stop)
         signal.signal(signal.SIGINT, self.stop)
         signal.signal(signal.SIGHUP, lambda *_: self.reload())
-        write_state(self.layer, self.layers())
+        self.publish()
         # Bring the virtual keyboard up now rather than on the first shortcut,
         # so the adoption pause is paid at login and not on a keypress. If it
         # cannot open yet it is retried on first use.

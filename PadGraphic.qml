@@ -66,10 +66,13 @@ Item {
             // yellow on this pad, and keeping that makes the picture findable
             // at a glance rather than a generic grid of squares.
             color: topRow ? "#F0CE4E" : "#2E2E2E"
+            // A programmed key keeps a firm outline so it still reads as a
+            // key once its label covers the cap: dark grey on the yellow caps,
+            // a lighter grey on the black ones where dark grey would vanish.
             border.width: isSelected ? Math.max(2, root.unit * 0.16)
-                                     : Math.max(1, root.unit * 0.06)
+              : (bound ? Math.max(1.5, root.unit * 0.11) : Math.max(1, root.unit * 0.06))
             border.color: isSelected ? Color.accent
-              : (bound ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.55)
+              : (bound ? (topRow ? "#3A3A3A" : "#7A7A7A")
                        : Qt.darker(cap.color, 1.4))
             Behavior on anchors.margins { NumberAnimation { duration: 90 } }
 
@@ -120,17 +123,17 @@ Item {
       radius: root.unit * 0.5
       color: "#12211C"
 
-      // The green LED. Lit for layer one on the real pad; here it tracks OUR
-      // layer, which is the one that actually decides anything.
+      // The green LED. On the real pad it means power; here it means the
+      // daemon is holding a pad, over either transport.
       Rectangle {
         x: root.unit * 0.45; y: root.unit * 0.45
         width: root.unit * 0.55; height: width; radius: width / 2
-        color: root.service && root.service.daemonRunning ? "#3BE06B" : "#2A4034"
+        color: root.service && root.service.padConnected ? "#3BE06B" : "#2A4034"
         Rectangle {
           anchors.centerIn: parent
           width: parent.width * 2.4; height: width; radius: width / 2
           color: parent.color
-          opacity: root.service && root.service.daemonRunning ? 0.18 : 0
+          opacity: root.service && root.service.padConnected ? 0.18 : 0
         }
       }
 

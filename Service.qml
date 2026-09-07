@@ -28,6 +28,12 @@ Item {
   property string activeLayerName: ""
   property bool daemonRunning: false
   property string lastError: ""
+  // Which pads the daemon holds right now, from its state file. A pad can be
+  // on USB and Bluetooth at once; each lights its own indicator.
+  property var connections: []
+  readonly property bool usbConnected: connections.some(function (d) { return d.bus === "usb" })
+  readonly property bool bluetoothConnected: connections.some(function (d) { return d.bus === "bluetooth" })
+  readonly property bool padConnected: connections.length > 0
 
   readonly property var layers: config && config.layers ? config.layers : []
 
@@ -103,9 +109,11 @@ Item {
         var s = JSON.parse(text())
         root.activeLayer = s.layer || 0
         root.activeLayerName = s.name || ""
+        root.connections = s.devices || []
         root.daemonRunning = true
       } catch (e) {
         root.daemonRunning = false
+        root.connections = []
       }
     }
   }
