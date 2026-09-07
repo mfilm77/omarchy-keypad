@@ -26,7 +26,8 @@ PanelWindow {
 
   // The editor's own state. "command" or "shortcut"; the recorded chord as
   // shown to the user ("SUPER + 1") and as evdev codes for the daemon.
-  property string mode: "command"
+  property string mode: "command"      // "command" | "shortcut" | "app"
+  property string appId: ""            // desktop id chosen in app mode
   property bool recording: false
   property string recKeys: ""
   property var recCodes: []
@@ -78,11 +79,40 @@ PanelWindow {
       mode = "shortcut"
       recKeys = a.keys || ""
       recCodes = a.codes || []
+      appId = ""
+    } else if (a && a.app) {
+      mode = "app"
+      appId = a.app
+      recKeys = ""
+      recCodes = []
     } else {
       mode = "command"
+      appId = ""
       recKeys = ""
       recCodes = []
     }
+    appPicker.value = appId
+  }
+
+  // Every installed app with a launcher entry, for the "Open an app" picker.
+  // Read from the same DesktopEntries the shell's own launcher uses, so what
+  // is offered here is exactly what SUPER+SPACE offers.
+  readonly property var appOptions: {
+    var values = DesktopEntries.applications.values || []
+    var out = []
+    for (var i = 0; i < values.length; i++) {
+      var e = values[i]
+      if (!e || e.noDisplay) continue
+      out.push({ value: String(e.id), label: String(e.name || e.id),
+                 description: String(e.genericName || e.comment || "") })
+    }
+    out.sort(function (a, b) { return a.label.toLowerCase() < b.label.toLowerCase() ? -1 : 1 })
+    return out
+  }
+  function appName(id) {
+    for (var i = 0; i < appOptions.length; i++)
+      if (appOptions[i].value === id) return appOptions[i].label
+    return id
   }
 
   function syncLayerName() {
@@ -206,6 +236,18 @@ PanelWindow {
 
   function saveBinding() {
     if (!service || !selected) return
+    if (mode === "app") {
+      if (!appId) { recPending = "Pick an app first"; return }
+      // Launched the way the shell's launcher does it: gtk-launch resolves the
+      // desktop entry, uwsm-app puts it in its own scope under the session.
+      service.setBinding(layerIndex, selected, ({
+        type: "command",
+        label: labelField.text || appName(appId),
+        app: appId,
+        run: "uwsm-app -- gtk-launch " + Util.shellQuote(appId + ".desktop")
+      }))
+      return
+    }
     if (mode === "shortcut") {
       if (!recCodes || recCodes.length === 0) {
         recPending = "Record a shortcut first"
@@ -479,6 +521,38 @@ PanelWindow {
               text: "Press a shortcut"
               primary: root.mode === "shortcut"
               onClicked: root.mode = "shortcut"
+            }
+            TextButton {
+              text: "Open an app"
+              primary: root.mode === "app"
+              onClicked: { root.cancelRecording(); root.mode = "app" }
+            }
+          }
+        }
+
+        Row {
+          width: parent.width
+          spacing: Style.spacing.sm
+          visible: root.mode === "app"
+          Text {
+            text: "Opens"
+            width: Style.space(70)
+            color: Color.foreground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+            anchors.verticalCenter: parent.verticalCenter
+          }
+          SearchableDropdown {
+            id: appPicker
+            width: parent.width - Style.space(80)
+            showLabel: false
+            options: root.appOptions
+            placeholderText: "Type to search installed apps…"
+            triggerLabel: "Choose an app"
+            anchors.verticalCenter: parent.verticalCenter
+            onChanged: function (v) {
+              root.appId = v
+              if (!labelField.text) labelField.text = root.appName(v)
             }
           }
         }
