@@ -93,7 +93,7 @@ Item {
               text: action ? (action.label || action.keys || action.run || "") : ""
               color: topRow ? "#1A1A1A" : "#F2F2F2"
               font.family: Style.font.family
-              font.pixelSize: Math.max(8, root.unit * 0.52)
+              font.pixelSize: Math.max(7, root.unit * 0.52 - 2)
               wrapMode: Text.Wrap
               horizontalAlignment: Text.AlignHCenter
               verticalAlignment: Text.AlignVCenter

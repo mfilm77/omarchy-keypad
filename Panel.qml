@@ -109,6 +109,9 @@ PanelWindow {
     out.sort(function (a, b) { return a.label.toLowerCase() < b.label.toLowerCase() ? -1 : 1 })
     return out
   }
+  function shellQuote(value) {
+    return "'" + String(value || "").replace(/'/g, "'\\''") + "'"
+  }
   function appName(id) {
     for (var i = 0; i < appOptions.length; i++)
       if (appOptions[i].value === id) return appOptions[i].label
@@ -244,7 +247,7 @@ PanelWindow {
         type: "command",
         label: labelField.text || appName(appId),
         app: appId,
-        run: "uwsm-app -- gtk-launch " + Util.shellQuote(appId + ".desktop")
+        run: "uwsm-app -- gtk-launch " + shellQuote(appId + ".desktop")
       }))
       return
     }

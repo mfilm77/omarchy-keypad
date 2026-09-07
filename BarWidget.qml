@@ -45,7 +45,7 @@ BarWidget {
     verticalPadding: 2
     tooltipText: root.live
       ? "Keypad over " + root.transport
-        + (root.service.bluetoothBattery >= 0 ? " (battery " + root.service.bluetoothBattery + "%)" : "")
+        + (root.service && root.service.bluetoothBattery >= 0 ? " (battery " + root.service.bluetoothBattery + "%)" : "")
         + " · layer " + (root.layerIndex + 1)
         + (root.layerName ? " (" + root.layerName + ")" : "") + "\nClick to edit what the keys do"
       : (root.service && root.service.daemonRunning ? "Keypad · no pad connected" : "Keypad · not running")
