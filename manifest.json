@@ -3,7 +3,7 @@
   "id": "vlad.keypad",
   "name": "Keypad",
   "version": "0.1.0",
-  "author": "Vlad Martins",
+  "author": "mfilm",
   "license": "MIT",
   "description": "Turn a cheap USB macropad into a programmable control surface. Draws your pad, and clicking a key or a knob assigns it a command. Layers are done in software, because these pads report the same keycodes on every hardware layer and say nothing when their layer button is pressed.",
   "kinds": [
