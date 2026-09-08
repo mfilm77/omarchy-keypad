@@ -33,7 +33,7 @@ PanelWindow {
   property var recCodes: []
   property string recPending: ""
 
-  readonly property string pluginId: manifest && manifest.id ? manifest.id : "vlad.keypad"
+  readonly property string pluginId: manifest && manifest.id ? manifest.id : "io.github.mfilm77.keypad"
 
   // The shell summons a panel by calling open() and hides it by calling
   // close(). Closing from inside goes back through shell.hide() rather than
@@ -271,8 +271,8 @@ PanelWindow {
     }
   }
 
-  Process { id: recordModeStart; command: [Quickshell.env("HOME") + "/.config/omarchy/plugins/vlad.keypad/bin/keypad-record-mode", "start"] }
-  Process { id: recordModeStop;  command: [Quickshell.env("HOME") + "/.config/omarchy/plugins/vlad.keypad/bin/keypad-record-mode", "stop"] }
+  Process { id: recordModeStart; command: [Quickshell.env("HOME") + "/.config/omarchy/plugins/io.github.mfilm77.keypad/bin/keypad-record-mode", "start"] }
+  Process { id: recordModeStop;  command: [Quickshell.env("HOME") + "/.config/omarchy/plugins/io.github.mfilm77.keypad/bin/keypad-record-mode", "stop"] }
   Timer { id: recordTimeout; interval: 20000; onTriggered: root.cancelRecording() }
 
   Rectangle {

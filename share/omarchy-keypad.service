@@ -7,7 +7,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/.config/omarchy/plugins/vlad.keypad/bin/keypadd.py
+ExecStart=%h/.config/omarchy/plugins/io.github.mfilm77.keypad/bin/keypadd.py
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=2

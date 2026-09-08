@@ -7,12 +7,12 @@ import qs.Ui
 // anything once this plugin is driving it.
 BarWidget {
   id: root
-  moduleName: "vlad.keypad"
+  moduleName: "io.github.mfilm77.keypad"
 
   // The shell hands a plugin service to panels by assignment, but a bar
   // widget has to ask for it.
   readonly property var service: bar && bar.shell
-    ? bar.shell.serviceFor("vlad.keypad") : null
+    ? bar.shell.serviceFor("io.github.mfilm77.keypad") : null
   readonly property bool showName: setting("showName", true)
   readonly property bool live: service ? (service.daemonRunning && service.padConnected) : false
   readonly property string transport: service
@@ -66,8 +66,8 @@ BarWidget {
     tooltipText: root.tooltip()
     onPressed: {
       if (!bar || !bar.shell) return
-      if (typeof bar.shell.toggle === "function") bar.shell.toggle("vlad.keypad", "{}")
-      else if (typeof bar.shell.summon === "function") bar.shell.summon("vlad.keypad", "{}")
+      if (typeof bar.shell.toggle === "function") bar.shell.toggle("io.github.mfilm77.keypad", "{}")
+      else if (typeof bar.shell.summon === "function") bar.shell.summon("io.github.mfilm77.keypad", "{}")
     }
   }
 }
