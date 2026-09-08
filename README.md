@@ -82,6 +82,23 @@ choose what it does:
 Save. Changes are live — the daemon rereads on `SIGHUP` and never drops the
 grab, so no keypress escapes as a stray letter mid-edit.
 
+### What you get out of the box
+
+`share/config.default.json` ships three worked layers, so the pad does something
+useful the moment it is installed. Rebind anything you don't want.
+
+| | Layer 1 — Main | Layer 2 — System | Layer 3 — Media |
+|---|---|---|---|
+| Keys 1–4 | Workspaces 1–4 | Gaps · Transparency · Fullscreen · Layout | Play/pause · Prev · Next · Spotify |
+| Keys 5–8 | Terminal · Browser · Files · Screenshot | Record screen · Scan QR · Grab text · Keybindings | Copy · Paste · Undo · Redo |
+| Keys 9–12 | Emoji · Clipboard · Omarchy menu · Screensaver | Share · Input · Edit config · About | — |
+| Knob 1 | Volume, press to mute | Brightness, press to mute | Volume, press to mute |
+| Knob 2 | Press for the next layer | Press for the next layer | Press to go back to Main |
+
+Layers 1 and 2 are all Omarchy commands. Layer 3 shows the other binding type:
+`Copy`, `Paste`, `Undo` and `Redo` are recorded **shortcuts**, pressed on the
+virtual keyboard rather than shelled out.
+
 To rename the layer you are on, type in the *Rename* field next to the tabs.
 
 ### How shortcut recording works

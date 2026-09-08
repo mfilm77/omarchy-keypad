@@ -1,58 +1,66 @@
 {
   "devices": [
-    {
-      "bus": "usb",
-      "vendor": "1189",
-      "product": "8840"
-    },
-    {
-      "bus": "bluetooth",
-      "name": "MINI_KEYBOARD",
-      "vendor": "05ac",
-      "product": "022c"
-    }
+    { "bus": "usb", "vendor": "1189", "product": "8840" },
+    { "bus": "bluetooth", "name": "MINI_KEYBOARD", "vendor": "05ac", "product": "022c" }
   ],
   "layers": [
     {
       "name": "Main",
       "bindings": {
-        "knob1_left": {
-          "type": "command",
-          "label": "Volume down",
-          "run": "omarchy-audio-output-volume lower"
-        },
-        "knob1_right": {
-          "type": "command",
-          "label": "Volume up",
-          "run": "omarchy-audio-output-volume raise"
-        },
-        "knob1_press": {
-          "type": "command",
-          "label": "Mute",
-          "run": "omarchy-audio-output-volume mute-toggle"
-        },
-        "knob2_press": {
-          "type": "layer",
-          "label": "Next layer"
-        }
+        "k1":  { "type": "command", "label": "Workspace 1", "run": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"1\" })'" },
+        "k2":  { "type": "command", "label": "Workspace 2", "run": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"2\" })'" },
+        "k3":  { "type": "command", "label": "Workspace 3", "run": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"3\" })'" },
+        "k4":  { "type": "command", "label": "Workspace 4", "run": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"4\" })'" },
+        "k5":  { "type": "command", "label": "Terminal",    "run": "omarchy-launch-terminal" },
+        "k6":  { "type": "command", "label": "Browser",     "run": "omarchy-launch-browser" },
+        "k7":  { "type": "command", "label": "Files",       "run": "omarchy-launch-nautilus" },
+        "k8":  { "type": "command", "label": "Screenshot",  "run": "omarchy-capture-region" },
+        "k9":  { "type": "command", "label": "Emoji",       "run": "omarchy-menu-emoji" },
+        "k10": { "type": "command", "label": "Clipboard",   "run": "omarchy-menu-clipboard" },
+        "k11": { "type": "command", "label": "Omarchy menu","run": "omarchy-menu" },
+        "k12": { "type": "command", "label": "Screensaver", "run": "omarchy-launch-screensaver" },
+        "knob1_left":  { "type": "command", "label": "Volume down", "run": "omarchy-audio-output-volume lower" },
+        "knob1_right": { "type": "command", "label": "Volume up",   "run": "omarchy-audio-output-volume raise" },
+        "knob1_press": { "type": "command", "label": "Mute",        "run": "omarchy-audio-output-volume mute-toggle" },
+        "knob2_press": { "type": "layer",   "label": "Next layer" }
       }
     },
     {
-      "name": "Two",
+      "name": "System",
       "bindings": {
-        "knob2_press": {
-          "type": "layer",
-          "label": "Next layer"
-        }
+        "k1":  { "type": "command", "label": "Gaps",         "run": "omarchy-hyprland-window-gaps-toggle" },
+        "k2":  { "type": "command", "label": "Transparency", "run": "omarchy-hyprland-window-transparency-toggle" },
+        "k3":  { "type": "command", "label": "Fullscreen",   "run": "omarchy-hyprland-window-tiled-fullscreen-toggle" },
+        "k4":  { "type": "command", "label": "Layout",       "run": "omarchy-hyprland-workspace-layout-toggle" },
+        "k5":  { "type": "command", "label": "Record screen","run": "omarchy-capture-screenrecording" },
+        "k6":  { "type": "command", "label": "Scan QR",      "run": "omarchy-capture-qr" },
+        "k7":  { "type": "command", "label": "Grab text",    "run": "omarchy-capture-text" },
+        "k8":  { "type": "command", "label": "Keybindings",  "run": "omarchy-menu-keybindings" },
+        "k9":  { "type": "command", "label": "Share",        "run": "omarchy-menu-share" },
+        "k10": { "type": "command", "label": "Input",        "run": "omarchy-menu-input" },
+        "k11": { "type": "command", "label": "Edit config",  "run": "omarchy-launch-config-editor" },
+        "k12": { "type": "command", "label": "About",        "run": "omarchy-launch-about" },
+        "knob1_left":  { "type": "command", "label": "Brightness down", "run": "omarchy-brightness-display 5%-" },
+        "knob1_right": { "type": "command", "label": "Brightness up",   "run": "omarchy-brightness-display +5%" },
+        "knob1_press": { "type": "command", "label": "Mute",            "run": "omarchy-audio-output-volume mute-toggle" },
+        "knob2_press": { "type": "layer",   "label": "Next layer" }
       }
     },
     {
-      "name": "Three",
+      "name": "Media",
       "bindings": {
-        "knob2_press": {
-          "type": "layer",
-          "label": "Next layer"
-        }
+        "k1":  { "type": "command", "label": "Play / pause", "run": "playerctl play-pause" },
+        "k2":  { "type": "command", "label": "Previous",     "run": "playerctl previous" },
+        "k3":  { "type": "command", "label": "Next",         "run": "playerctl next" },
+        "k4":  { "type": "command", "label": "Spotify",      "run": "omarchy-launch-spotify" },
+        "k5":  { "type": "shortcut","label": "Copy",  "keys": "CTRL + C", "codes": [29, 46] },
+        "k6":  { "type": "shortcut","label": "Paste", "keys": "CTRL + V", "codes": [29, 47] },
+        "k7":  { "type": "shortcut","label": "Undo",  "keys": "CTRL + Z", "codes": [29, 44] },
+        "k8":  { "type": "shortcut","label": "Redo",  "keys": "CTRL + SHIFT + Z", "codes": [29, 42, 44] },
+        "knob1_left":  { "type": "command", "label": "Volume down", "run": "omarchy-audio-output-volume lower" },
+        "knob1_right": { "type": "command", "label": "Volume up",   "run": "omarchy-audio-output-volume raise" },
+        "knob1_press": { "type": "command", "label": "Mute",        "run": "omarchy-audio-output-volume mute-toggle" },
+        "knob2_press": { "type": "layer",   "label": "Back to Main", "to": 0 }
       }
     }
   ]
