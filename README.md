@@ -59,7 +59,7 @@ bindings.
 ```bash
 systemctl --user disable --now omarchy-keypad.service
 rm -f ~/.config/systemd/user/omarchy-keypad.service && systemctl --user daemon-reload
-omarchy plugin remove vlad.keypad
+omarchy plugin remove io.github.mfilm77.keypad
 sudo rm -f /etc/udev/rules.d/70-omarchy-keypad.rules /etc/modules-load.d/omarchy-keypad.conf
 sudo udevadm control --reload && sudo udevadm trigger
 ```
