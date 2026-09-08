@@ -2,6 +2,8 @@
 
 Turns a cheap USB macropad into a programmable control surface on Omarchy.
 
+![The keypad editor — the pad drawn on screen, click a key or a knob to bind it](docs/panel.png)
+
 Built for a 12-key, 2-knob pad (USB `1189:8840`, sold as a "Sikai" pad), but the
 device identity is in the config so any pad that reports plain keycodes will
 work. The pad is matched on any bus: plugged in over USB, or paired over
@@ -29,7 +31,7 @@ hotkeys without breaking typing. The daemon therefore grabs the pad
 ## Install
 
 ```bash
-omarchy plugin add <repo-url> --enable --yes
+omarchy plugin add https://github.com/mfilm77/omarchy-keypad --enable --yes
 sudo cp share/70-omarchy-keypad.rules /etc/udev/rules.d/
 echo uinput | sudo tee /etc/modules-load.d/omarchy-keypad.conf && sudo modprobe uinput
 sudo udevadm control --reload && sudo udevadm trigger

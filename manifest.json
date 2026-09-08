@@ -3,10 +3,14 @@
   "id": "vlad.keypad",
   "name": "Keypad",
   "version": "0.1.0",
-  "author": "Vlad",
+  "author": "Vlad Martins",
   "license": "MIT",
   "description": "Turn a cheap USB macropad into a programmable control surface. Draws your pad, and clicking a key or a knob assigns it a command. Layers are done in software, because these pads report the same keycodes on every hardware layer and say nothing when their layer button is pressed.",
-  "kinds": ["service", "bar-widget", "panel"],
+  "kinds": [
+    "service",
+    "bar-widget",
+    "panel"
+  ],
   "keepLoaded": true,
   "entryPoints": {
     "service": "Service.qml",
@@ -19,7 +23,9 @@
     "category": "Input",
     "allowMultiple": false,
     "defaultSection": "right",
-    "defaults": { "showName": true },
+    "defaults": {
+      "showName": true
+    },
     "schema": [
       {
         "key": "showName",
@@ -29,5 +35,6 @@
         "description": "Show the layer's name next to the icon, not just its number."
       }
     ]
-  }
+  },
+  "repository": "https://github.com/mfilm77/omarchy-keypad"
 }
