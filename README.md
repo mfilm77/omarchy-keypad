@@ -46,6 +46,29 @@ to every keyboard on the machine. The same rule grants `/dev/uinput`, which is
 where shortcut bindings are typed from; the `uinput` module has to be loaded for
 that node to exist with the right permissions.
 
+## Requirements
+
+Omarchy 4 (Quattro) with the Quickshell-based shell. No pip packages — the daemon reads evdev
+directly from the Python standard library. It shells out to `hyprctl` (window/workspace actions and
+the recording submap), `systemctl --user` (its own unit), `qs` (the shell IPC) and, only if present,
+`bluetoothctl` for the Bluetooth battery reading. The `uinput` kernel module is needed for shortcut
+bindings.
+
+## Removal
+
+```bash
+systemctl --user disable --now omarchy-keypad.service
+rm -f ~/.config/systemd/user/omarchy-keypad.service && systemctl --user daemon-reload
+omarchy plugin remove vlad.keypad
+sudo rm -f /etc/udev/rules.d/70-omarchy-keypad.rules /etc/modules-load.d/omarchy-keypad.conf
+sudo udevadm control --reload && sudo udevadm trigger
+```
+
+Your bindings are left alone at `~/.config/omarchy-keypad/config.json` — delete that directory too if
+you want them gone. Nothing outside these paths is touched, and no existing configuration is
+overwritten at install: the udev rule and the systemd unit are new files under this plugin's own
+name, and the recording submap is registered at runtime rather than written into your Hyprland config.
+
 ## Use
 
 Click the bar widget. Click a key or a knob in the picture, give it a name, and
