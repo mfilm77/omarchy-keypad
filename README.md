@@ -75,9 +75,20 @@ Click the bar widget. Click a key or a knob in the picture, give it a name, and
 choose what it does:
 
 - **Run a command** — any shell command, e.g. `hyprctl dispatch 'hl.dsp.focus({ workspace = "3" })'` (Hyprland 0.56+ takes Lua; older setups use `hyprctl dispatch workspace 3`).
+  Pick from the **Preset** list to fill the field with one of the commands the
+  plugin ships — menus, capture, sound, windows, workspaces, apps, system — or
+  type your own. A preset fills the field in; it does not lock it.
 - **Press a shortcut** — click the box, press the chord on your keyboard, and
   that is what the key will press. Recorded, not typed, so there is nothing to
   spell.
+- **Open an app** — search the same launcher entries `SUPER + SPACE` offers.
+
+A recorded shortcut can be **tapped** or **held**. Tap is the default and is
+right for nearly everything. Hold keeps the chord down for exactly as long as
+the pad key is down, which is what anything that watches key-down and key-up
+separately needs — push-to-talk dictation being the usual one. (For dictation
+specifically, the command `voxtype record toggle` is often nicer: press to
+start, press to stop, and your hand is free in between.)
 
 Save. Changes are live — the daemon rereads on `SIGHUP` and never drops the
 grab, so no keypress escapes as a stray letter mid-edit.
@@ -130,6 +141,7 @@ keycodes and misses every `code:` bind.
 | `Panel.qml` | The editor |
 | `PadGraphic.qml` / `KnobGraphic.qml` | The drawing of the pad |
 | `BarWidget.qml` | Current layer in the bar |
+| `share/presets.json` | The ready-made commands the editor offers |
 | `~/.config/omarchy-keypad/config.json` | Your bindings |
 
 A binding in `config.json` is one of:
@@ -137,6 +149,7 @@ A binding in `config.json` is one of:
 ```json
 { "type": "command",  "label": "Workspace 3", "run": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"3\" })'" }
 { "type": "shortcut", "label": "Undo", "keys": "CTRL + Z", "codes": [29, 44] }
+{ "type": "hold",     "label": "Talk", "keys": "F9", "codes": [67] }
 { "type": "layer",    "label": "Next layer" }
 { "type": "layer",    "label": "Resolve keys", "to": 1 }
 ```

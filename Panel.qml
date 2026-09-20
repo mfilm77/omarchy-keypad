@@ -29,6 +29,7 @@ PanelWindow {
   property string mode: "command"      // "command" | "shortcut" | "app"
   property string appId: ""            // desktop id chosen in app mode
   property bool recording: false
+  property bool holdMode: false        // a recorded chord: tapped, or held down
   property string recKeys: ""
   property var recCodes: []
   property string recPending: ""
@@ -74,9 +75,10 @@ PanelWindow {
     cancelRecording()
     var a = root.action
     labelField.text = a ? (a.label || "") : ""
-    runField.text = a && a.type !== "shortcut" ? (a.run || "") : ""
-    if (a && a.type === "shortcut") {
+    runField.text = a && a.type !== "shortcut" && a.type !== "hold" ? (a.run || "") : ""
+    if (a && (a.type === "shortcut" || a.type === "hold")) {
       mode = "shortcut"
+      holdMode = a.type === "hold"
       recKeys = a.keys || ""
       recCodes = a.codes || []
       appId = ""
@@ -280,7 +282,7 @@ PanelWindow {
         return
       }
       service.setBinding(layerIndex, selected, ({
-        type: "shortcut",
+        type: holdMode ? "hold" : "shortcut",
         label: labelField.text || recKeys,
         keys: recKeys,
         codes: recCodes
@@ -692,6 +694,38 @@ PanelWindow {
             Item {
               id: recorder
               Keys.onPressed: function (event) { root.captureKey(event) }
+            }
+          }
+        }
+
+        // Tap or hold. A tap is over in milliseconds, which is right for a
+        // shortcut and useless for anything that watches key-down and key-up
+        // separately — push-to-talk dictation being the one everybody meets
+        // first.
+        Row {
+          width: parent.width
+          spacing: Style.spacing.sm
+          visible: root.mode === "shortcut"
+          Text {
+            text: "How"
+            width: Style.space(70)
+            color: Color.foreground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+            anchors.verticalCenter: parent.verticalCenter
+          }
+          Row {
+            spacing: Style.spacing.xs
+            anchors.verticalCenter: parent.verticalCenter
+            TextButton {
+              text: "Tap it"
+              primary: !root.holdMode
+              onClicked: root.holdMode = false
+            }
+            TextButton {
+              text: "Hold while the key is down"
+              primary: root.holdMode
+              onClicked: root.holdMode = true
             }
           }
         }

@@ -8,9 +8,27 @@ Commit locally as you go; push only when cutting a release.
 
 ---
 
+## Done, waiting for the release
+
+- **1 — the hold bug.** `hold` action type added: the daemon now reads key
+  releases, presses the chord on key-down and lets it go on key-up, and drops
+  everything held if a pad disappears mid-hold or the daemon stops. The editor
+  offers *Tap it* / *Hold while the key is down* on a recorded shortcut.
+  **Not yet run on a live machine** — only `py_compile` and `qmllint`.
+- **2 — command presets.** 89 commands in `share/presets.json` across 9
+  categories, behind a searchable picker in the editor. Every command verified
+  on a live Omarchy 4 box: shell commands resolve to real binaries, `hl.dsp.*`
+  functions confirmed through `hyprctl eval` (side-effect free, unlike
+  dispatching them).
+
+Before the release: run both on a real pad, then push once and re-verify the
+listing.
+
+---
+
 ## Bugs
 
-### 1. A shortcut binding cannot hold a key down
+### 1. A shortcut binding cannot hold a key down — FIXED, UNTESTED ON HARDWARE
 `VirtualKeyboard.tap()` (`bin/keypadd.py`) presses the codes in order and releases them in
 reverse, 8 ms apart — the whole chord is over in about 16 ms. Any binding whose target
 distinguishes key-down from key-up therefore does nothing at all, silently.
@@ -45,7 +63,7 @@ tapped, not held, and that hold-style binds want a command instead.
 
 ## Features
 
-### 2. Command presets in the editor
+### 2. Command presets in the editor — DONE, UNTESTED ON HARDWARE
 Right now the command mode is an empty text field: you have to know that
 `omarchy-menu toggle capture` exists and type it exactly. Ship a catalogue of ~50+ ready-made
 commands (menus, capture, audio, windows, workspaces, apps, system) as

@@ -353,9 +353,47 @@ class VirtualKeyboard:
         os.write(self.fd, struct.pack(EVENT_FMT, sec, usec, EV_KEY, code, value))
         os.write(self.fd, struct.pack(EVENT_FMT, sec, usec, EV_SYN, SYN_REPORT, 0))
 
+    def press(self, codes):
+        """Hold the codes down, in order, and leave them down."""
+        if not codes or not self.open():
+            return False
+        try:
+            for code in codes:
+                self._emit(code, 1)
+                time.sleep(0.008)
+        except OSError as e:
+            log("hold failed: %s" % e)
+            self.close()
+            return False
+        return True
+
+    def release(self, codes):
+        """Let the codes go, in reverse — the order a hand would use.
+
+        Best-effort by design: it is called when a pad key comes up, when a pad
+        disappears mid-hold, and on shutdown, and a modifier left down would be
+        far worse than a failed release. So it never raises.
+        """
+        if not codes or self.fd is None:
+            return False
+        try:
+            for code in reversed(codes):
+                self._emit(code, 0)
+                time.sleep(0.008)
+        except OSError as e:
+            log("release failed: %s" % e)
+            self.close()
+            return False
+        return True
+
     def tap(self, codes):
         """Press the codes in order, release them in reverse — SUPER then 1,
-        then 1 up, then SUPER up — which is how a person presses a chord."""
+        then 1 up, then SUPER up — which is how a person presses a chord.
+
+        A tap is over in milliseconds, so anything that distinguishes key-down
+        from key-up — push-to-talk dictation, a walkie-talkie button, a game
+        key — wants a `hold` binding instead.
+        """
         if not codes or not self.open():
             return False
         try:
@@ -395,6 +433,8 @@ class Daemon:
         self.last_battery = 0.0
         self.last_scan = 0.0
         self.seen_axes = set()
+        # control -> the codes a `hold` binding is holding down right now.
+        self.held = {}
         self.running = True
         self.keyboard = VirtualKeyboard()
 
@@ -463,6 +503,11 @@ class Daemon:
         if fd is None:
             return
         log("released %s" % node)
+        # A pad that vanishes mid-hold never sends its key-up, so the hold
+        # would stay down for good. Everything held goes, deliberately: a
+        # stuck SUPER or CTRL is far worse than cutting another pad's hold
+        # short in the rare case where two pads are live at once.
+        self.release_all()
         try:
             fcntl.ioctl(fd, EVIOCGRAB, 0)
         except OSError:
@@ -473,10 +518,34 @@ class Daemon:
             pass
         self.publish()
 
+    def release_held(self, control):
+        """Let go of whatever a `hold` binding on this control put down.
+
+        The codes released are the ones actually pressed, remembered at
+        key-down, not the ones the config holds now: the layer may have changed
+        or the config been reloaded while the key was down, and releasing a
+        different set would leave the first one stuck.
+        """
+        codes = self.held.pop(control, None)
+        if not codes:
+            return
+        self.keyboard.release(codes)
+        log("%s released" % control)
+
+    def release_all(self):
+        for control in list(self.held):
+            self.release_held(control)
+
     def handle(self, code, value):
-        if value != 1:  # presses only; releases and autorepeat are not actions
+        if value == 2:  # autorepeat: the key is already down and already acted on
             return
         control = KEYCODES.get(code)
+        if value == 0:
+            # Only a `hold` binding cares about a release, and only if this
+            # control is the one holding something down.
+            if control:
+                self.release_held(control)
+            return
         if not control:
             # Logged so a pad that speaks differently on another bus can be
             # mapped from the journal instead of guessed at.
@@ -506,6 +575,16 @@ class Daemon:
                 log("shortcut on %s has no keys" % control)
                 return
             self.keyboard.tap(codes)
+        elif kind == "hold":
+            codes = shortcut_codes(action)
+            if not codes:
+                log("hold on %s has no keys" % control)
+                return
+            # A repeat press with no release in between (a dropped release, a
+            # pad replugged mid-hold) would otherwise leak the first set.
+            self.release_held(control)
+            if self.keyboard.press(codes):
+                self.held[control] = codes
 
     def reload(self):
         self.config = load_config()
@@ -564,6 +643,7 @@ class Daemon:
                         log("pad sends axis events type=%d code=%d (not mapped)" % (etype, code))
         for node in list(self.fds):
             self.close_device(node)
+        self.release_all()
         self.keyboard.close()
         log("stopped")
 
