@@ -45,6 +45,31 @@ Item {
 
   readonly property var layers: config && config.layers ? config.layers : []
 
+  // Ready-made commands for the editor, shipped in share/presets.json. Held
+  // here rather than in the panel so they are already loaded the first time the
+  // panel is summoned. The plugin's own directory is wherever the shell copied
+  // it, so it is resolved relative to this file rather than guessed.
+  property var presets: []
+  readonly property string pluginDir: {
+    var u = String(Qt.resolvedUrl("."))
+    return u.indexOf("file://") === 0 ? u.substring(7) : u
+  }
+
+  FileView {
+    id: presetsFile
+    path: root.pluginDir + "share/presets.json"
+    onLoaded: {
+      try {
+        var p = JSON.parse(text())
+        root.presets = (p && p.presets) ? p.presets : []
+      } catch (e) {
+        // A broken presets file costs the picker, nothing else: the command
+        // field still takes anything typed into it.
+        root.presets = []
+      }
+    }
+  }
+
   // Every control the pad has, in the order the panel draws them. The names are
   // the daemon's too, so what the file says and what the picture shows agree.
   readonly property var keyIds: [

@@ -92,6 +92,9 @@ PanelWindow {
       recCodes = []
     }
     appPicker.value = appId
+    // A command that is one of the shipped ones shows its name in the picker;
+    // anything hand-written leaves the picker blank rather than lying about it.
+    presetPicker.value = root.presetName(runField.text) ? runField.text : ""
   }
 
   // Every installed app with a launcher entry, for the "Open an app" picker.
@@ -109,6 +112,21 @@ PanelWindow {
     out.sort(function (a, b) { return a.label.toLowerCase() < b.label.toLowerCase() ? -1 : 1 })
     return out
   }
+  // The shipped commands, as the dropdown wants them. The category and the
+  // command itself go in the description, so searching "capture", "volume" or
+  // "hyprctl" all find something.
+  readonly property var presetOptions: {
+    var src = service && service.presets ? service.presets : []
+    var out = []
+    for (var i = 0; i < src.length; i++) {
+      var p = src[i]
+      if (!p || !p.run) continue
+      out.push({ value: String(p.run), label: String(p.label || p.run),
+                 description: String(p.category || "") + " · " + String(p.run) })
+    }
+    return out
+  }
+
   function shellQuote(value) {
     return "'" + String(value || "").replace(/'/g, "'\\''") + "'"
   }
@@ -116,6 +134,11 @@ PanelWindow {
     for (var i = 0; i < appOptions.length; i++)
       if (appOptions[i].value === id) return appOptions[i].label
     return id
+  }
+  function presetName(run) {
+    for (var i = 0; i < presetOptions.length; i++)
+      if (presetOptions[i].value === run) return presetOptions[i].label
+    return ""
   }
 
   function syncLayerName() {
@@ -556,6 +579,36 @@ PanelWindow {
             onChanged: function (v) {
               root.appId = v
               if (!labelField.text) labelField.text = root.appName(v)
+            }
+          }
+        }
+
+        // Ready-made commands. Picking one fills both fields in and leaves them
+        // editable — the list is a starting point, not a menu of the only
+        // things a key may do.
+        Row {
+          width: parent.width
+          spacing: Style.spacing.sm
+          visible: root.mode === "command"
+          Text {
+            text: "Preset"
+            width: Style.space(70)
+            color: Qt.darker(Color.foreground, 1.4)
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+            anchors.verticalCenter: parent.verticalCenter
+          }
+          SearchableDropdown {
+            id: presetPicker
+            width: parent.width - Style.space(80)
+            showLabel: false
+            options: root.presetOptions
+            placeholderText: "Type to search ready-made commands…"
+            triggerLabel: "Choose a ready-made command"
+            anchors.verticalCenter: parent.verticalCenter
+            onChanged: function (v) {
+              runField.text = v
+              if (!labelField.text) labelField.text = root.presetName(v)
             }
           }
         }
