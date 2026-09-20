@@ -36,6 +36,7 @@
     { "category": "Sound", "label": "Switch audio output", "run": "omarchy-audio-output-switch" },
     { "category": "Sound", "label": "Switch media source", "run": "omarchy-audio-source-switch" },
     { "category": "Sound", "label": "Play / pause", "run": "omarchy-shell media playPause" },
+    { "category": "Sound", "label": "Pause everything (and resume it)", "run": "keypad-media-pause-all" },
     { "category": "Sound", "label": "Next track", "run": "omarchy-shell media next" },
     { "category": "Sound", "label": "Previous track", "run": "omarchy-shell media previous" },
 

@@ -137,3 +137,28 @@ direction is "up". The config and the drawing assume one arrangement. One-line s
 Key 1 = `a` … key 12 = `l`, read left-to-right, top-to-bottom. Taken from the order the keys
 were pressed during the capture session, never verified key by key. If it is wrong, the
 drawing's positions do not match the physical pad.
+
+---
+
+## In this batch — knob 1 pauses instead of muting
+
+Vlad, 2026-09-19: *"one of the knobs mutes the sound and I didn't want to mute the
+sound, I wanted to pause the sound that is coming from any playback."*
+
+Shipped: `bin/keypad-media-pause-all` — pauses every MPRIS player reporting
+`Playing`, remembers exactly which, and resumes only those on the next press.
+Pure `busctl`, no playerctl dependency. Bound to `knob1_press` on the Main and
+Media default layers; mute stays on the System layer and in the presets.
+`keypadd.py` now puts the plugin's `bin/` on PATH for actions, so a binding can
+name the script plainly.
+
+**Still worth doing, not done here:**
+
+- The action is a *command* binding like any other. A first-class action type
+  (`{"type": "media", "action": "pause-all"}`) would let the editor show it as a
+  named behaviour with its own icon rather than a shell string. Bigger change to
+  `Panel.qml` and `Service.qml` than this fix warranted.
+- The resume state file is `$XDG_RUNTIME_DIR/omarchy-keypad.paused-players`.
+  It is not shown anywhere; the panel could surface "3 players paused".
+- Untested against Spotify and VLC — both expose MPRIS, but neither was running
+  on the machine this was verified on.

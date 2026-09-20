@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# keypad-media-pause-all — pause whatever is making sound, and resume it again.
+#
+# This is the action to bind to a knob press when you want silence, not mute.
+# Muting leaves the video running and the podcast talking to nobody; this stops
+# the playback itself, in the browser tab, the video player or the music plugin,
+# whichever of them is actually playing.
+#
+# Press once  : every player that is PLAYING is paused, and remembered.
+# Press again : exactly those players are resumed — not every idle tab that
+#               happens to still hold an MPRIS name, which is what a plain
+#               "play-pause everything" would wake up.
+#
+# Speaks MPRIS over the session bus with busctl, so it needs nothing installed:
+# no playerctl, no python bindings. Any player with an MPRIS interface is
+# covered, which on a normal desktop means the browsers, mpv, VLC, Spotify and
+# the Omarchy Plex Music plugin.
+#
+# Silent and successful when there is nothing to do — it is on a key someone
+# will press by accident, so it must not pop up an error or fill the journal.
+
+set -u
+
+RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+STATE="$RUNTIME/omarchy-keypad.paused-players"
+
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$RUNTIME/bus}"
+
+# Every MPRIS player currently on the bus.
+players() {
+	busctl --user list --no-legend 2>/dev/null \
+		| awk '{ print $1 }' \
+		| grep '^org\.mpris\.MediaPlayer2\.' \
+		| sort -u
+}
+
+# "Playing", "Paused", "Stopped" — or nothing if the player just vanished.
+status_of() {
+	busctl --user get-property "$1" /org/mpris/MediaPlayer2 \
+		org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null \
+		| sed -n 's/^s "\(.*\)"$/\1/p'
+}
+
+# Pause and Play are optional in the spec; PlayPause is the fallback, and it is
+# safe here because we only ever send it to a player we have just read as being
+# in the wrong state.
+call() {
+	busctl --user call "$1" /org/mpris/MediaPlayer2 \
+		org.mpris.MediaPlayer2.Player "$2" >/dev/null 2>&1 \
+	|| busctl --user call "$1" /org/mpris/MediaPlayer2 \
+		org.mpris.MediaPlayer2.Player PlayPause >/dev/null 2>&1
+}
+
+playing=""
+for p in $(players); do
+	[ "$(status_of "$p")" = "Playing" ] && playing="$playing$p"$'\n'
+done
+
+if [ -n "$playing" ]; then
+	# Something is playing: stop all of it, and write down what we stopped.
+	printf '%s' "$playing" > "$STATE"
+	for p in $playing; do
+		call "$p" Pause
+	done
+	exit 0
+fi
+
+# Nothing is playing, so this press means "undo the last one". Players that have
+# quit since are skipped rather than woken; a name that is gone is not an error.
+[ -r "$STATE" ] || exit 0
+for p in $(cat "$STATE"); do
+	[ -n "$(status_of "$p")" ] && call "$p" Play
+done
+: > "$STATE"
+exit 0

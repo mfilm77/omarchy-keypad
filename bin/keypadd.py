@@ -52,6 +52,11 @@ BUS_VIRTUAL = 0x06
 KEY_MAX = 0x2FF
 
 CONFIG = os.path.expanduser("~/.config/omarchy-keypad/config.json")
+# Scripts this plugin ships alongside the daemon. Put on PATH for actions so a
+# binding can name one plainly — "keypad-media-pause-all" rather than a path
+# into the plugin directory, which differs between an installed and a linked
+# checkout and would break the moment either moved.
+BINDIR = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(
     os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "omarchy-keypad.state"
 )
@@ -266,6 +271,7 @@ def session_env():
     runtime = env.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
     env.setdefault("XDG_RUNTIME_DIR", runtime)
     env.setdefault("DBUS_SESSION_BUS_ADDRESS", "unix:path=%s/bus" % runtime)
+    env["PATH"] = BINDIR + os.pathsep + env.get("PATH", "/usr/local/bin:/usr/bin")
     try:
         hypr = os.path.join(runtime, "hypr")
         sigs = sorted(

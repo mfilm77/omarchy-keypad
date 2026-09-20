@@ -149,8 +149,17 @@ useful the moment it is installed. Rebind anything you don't want.
 | Keys 1–4 | Workspaces 1–4 | Gaps · Transparency · Fullscreen · Layout | Play/pause · Prev · Next · Spotify |
 | Keys 5–8 | Terminal · Browser · Files · Screenshot | Record screen · Scan QR · Grab text · Keybindings | Copy · Paste · Undo · Redo |
 | Keys 9–12 | Emoji · Clipboard · Omarchy menu · Screensaver | Share · Input · Edit config · About | — |
-| Knob 1 | Volume, press to mute | Brightness, press to mute | Volume, press to mute |
+| Knob 1 | Volume, press to pause all | Brightness, press to mute | Volume, press to pause all |
 | Knob 2 | Press for the next layer | Press for the next layer | Press to go back to Main |
+
+**Pressing knob 1 pauses, it does not mute.** Muting leaves the video running
+and the podcast talking to nobody; `keypad-media-pause-all` stops the playback
+itself — whichever player is actually making the sound, be it a YouTube tab, a
+video player, or the Plex Music plugin. Press it again and exactly those players
+resume, not every idle tab that happens to still be open. It speaks MPRIS over
+the session bus with `busctl`, so it needs nothing installed, and it does
+nothing quietly when nothing is playing. Mute is still there whenever you want
+it — on layer 2, and in the editor's *Sound* presets.
 
 Layers 1 and 2 are all Omarchy commands. Layer 3 shows the other binding type:
 `Copy`, `Paste`, `Undo` and `Redo` are recorded **shortcuts**, pressed on the
@@ -203,6 +212,7 @@ look like. A 👍 counts if you have nothing to add. Numbers are what decide it.
 |---|---|
 | `bin/keypadd.py` | Reads the pad, holds the layer, runs commands, presses shortcuts |
 | `bin/keypad-record-mode` | Enters/leaves the Hyprland submap used while recording |
+| `bin/keypad-media-pause-all` | Pauses every playing MPRIS player, and resumes those same ones |
 | `Service.qml` | Owns the config and the running state |
 | `Panel.qml` | The editor |
 | `PadGraphic.qml` / `KnobGraphic.qml` | The drawing of the pad |
