@@ -8,6 +8,13 @@ Commit locally as you go; push only when cutting a release.
 
 ---
 
+## Before the next push — not code
+
+- Author identity on the pre-release commits was reset to the GitHub noreply
+  address before this batch was pushed. Nothing else queued here.
+
+---
+
 ## Done, waiting for the release
 
 - **1 — the hold bug.** `hold` action type added: the daemon now reads key
@@ -20,6 +27,23 @@ Commit locally as you go; push only when cutting a release.
   on a live Omarchy 4 box: shell commands resolve to real binaries, `hl.dsp.*`
   functions confirmed through `hyprctl eval` (side-effect free, unlike
   dispatching them).
+
+- **4 — a fresh install works first time.** `bin/keypad-setup` does the
+  user-level setup itself, prints the three root steps before running them in a
+  single `sudo`, and never overwrites an existing rule, unit or bindings file.
+  `--check` lists every prerequisite with a fix line; `--json` feeds the panel.
+  README rewritten around that one command. **Verified end-to-end on
+  omarchy-zeus**, a machine that had the plugin directory and nothing else:
+  after setup, all five checks green and the daemon grabbed the Bluetooth pad.
+
+- **5 — a permission problem now says so.** `device_has_keys` answered `False`
+  for both "no keys" and "not allowed to look", so a connected pad with no udev
+  rule was dropped and the panel said *"No pad connected — plug it in or pair
+  it"*. It also made the EACCES branch in `open_devices()` unreachable. Now
+  `None` for EACCES/EPERM, carried through `find_devices` → daemon log → state
+  file → panel: *"Cannot read the pad — run keypad-setup in a terminal"*.
+  Tests in `test/test_permissions.py` (fakes only). **The pad-press path itself
+  is still only proven by the daemon grabbing the device** — see gate below.
 
 - **3 — name the hardware, and ask about future keypads.** The marketplace card
   showed only "a cheap USB macropad", so nobody browsing could tell which pad it
