@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+# omarchy:summary=Check and complete the keypad's system setup
+# omarchy:args=[--check] [--json]
+# omarchy:requires-sudo=true
+"""keypad-setup — make a fresh install work, and say plainly what is missing.
+
+Installing the plugin gives you the panel. It cannot give you permission to
+read a keyboard: that is a udev rule in /etc, a kernel module, and a user
+service, and Omarchy's plugin manifest (schemaVersion 1) has no install hook
+to run any of it. So this command exists, and everything that needs root is
+shown to you before it runs — never silently.
+
+  keypad-setup            complete the setup (asks for sudo once, if needed)
+  keypad-setup --check    report what is and is not in place, change nothing
+  keypad-setup --check --json   the same, for the panel
+
+Nothing here overwrites a file you already have. An existing udev rule, unit
+or config is reported and left exactly as it is.
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+# Normally the plugin is wherever this script sits. KEYPAD_PLUGIN_DIR overrides
+# that so the check can be run from a checkout, or against a copy, without
+# installing anything into ~/.config/omarchy/plugins (writing there makes the
+# shell reload every plugin and close open panels).
+PLUGIN = os.environ.get("KEYPAD_PLUGIN_DIR") or os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__)))
+SHARE = os.path.join(PLUGIN, "share")
+
+UDEV_RULE = "/etc/udev/rules.d/70-omarchy-keypad.rules"
+MODULES_CONF = "/etc/modules-load.d/omarchy-keypad.conf"
+UNIT_DIR = os.path.expanduser("~/.config/systemd/user")
+UNIT = os.path.join(UNIT_DIR, "omarchy-keypad.service")
+CONFIG_DIR = os.path.expanduser("~/.config/omarchy-keypad")
+CONFIG = os.path.join(CONFIG_DIR, "config.json")
+UINPUT = "/dev/uinput"
+
+OK, MISSING, BROKEN = "ok", "missing", "broken"
+
+
+def run(cmd, **kw):
+    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+
+
+def user_unit_state():
+    r = run(["systemctl", "--user", "is-active", "omarchy-keypad.service"])
+    return r.stdout.strip() or "unknown"
+
+
+def pad_nodes():
+    """(readable, denied) event nodes that look like our pad.
+
+    Reads the same config the daemon reads, so "our pad" means whatever the
+    user configured, not a hardcoded id.
+    """
+    sys.path.insert(0, os.path.join(PLUGIN, "bin"))
+    try:
+        import keypadd
+    except Exception:
+        return [], []
+    try:
+        cfg = keypadd.load_config()
+        found, denied = keypadd.find_devices(keypadd.device_specs(cfg))
+        return [n for n, _, _ in found], denied
+    except Exception:
+        return [], []
+
+
+def checks():
+    """Every prerequisite, each with what it is and how to fix it."""
+    out = []
+
+    out.append({
+        "id": "udev",
+        "what": "udev rule (lets you read the pad without being root)",
+        "state": OK if os.path.exists(UDEV_RULE) else MISSING,
+        "detail": UDEV_RULE,
+        "fix": "keypad-setup  (needs sudo once)",
+    })
+
+    if not os.path.exists(UINPUT):
+        uinput_state, uinput_detail = MISSING, "%s does not exist — the uinput module is not loaded" % UINPUT
+    elif os.access(UINPUT, os.W_OK):
+        uinput_state, uinput_detail = OK, UINPUT
+    else:
+        uinput_state, uinput_detail = BROKEN, "%s exists but you cannot write to it" % UINPUT
+    out.append({
+        "id": "uinput",
+        "what": "uinput (how the pad's shortcuts are typed)",
+        "state": uinput_state,
+        "detail": uinput_detail,
+        "fix": "keypad-setup  (needs sudo once)",
+    })
+
+    out.append({
+        "id": "config",
+        "what": "your bindings file",
+        "state": OK if os.path.exists(CONFIG) else MISSING,
+        "detail": CONFIG,
+        "fix": "keypad-setup",
+    })
+
+    unit_here = os.path.exists(UNIT)
+    active = user_unit_state() if unit_here else "not-installed"
+    out.append({
+        "id": "service",
+        "what": "the background service that reads the pad",
+        "state": OK if (unit_here and active == "active") else (MISSING if not unit_here else BROKEN),
+        "detail": "%s (%s)" % (UNIT, active),
+        "fix": "keypad-setup",
+    })
+
+    readable, denied = pad_nodes()
+    if readable:
+        pad_state = OK
+        pad_detail = "found at " + ", ".join(readable)
+    elif denied:
+        pad_state = BROKEN
+        pad_detail = ("found at %s but you are not allowed to read it — this is "
+                      "the udev rule, not the pad" % ", ".join(denied))
+    else:
+        pad_state = MISSING
+        pad_detail = "no pad found — plug it in or pair it over Bluetooth"
+    out.append({
+        "id": "pad",
+        "what": "the keypad itself",
+        "state": pad_state,
+        "detail": pad_detail,
+        "fix": "keypad-setup  (needs sudo once)" if denied else "plug the pad in or pair it",
+    })
+
+    return out
+
+
+def report(as_json=False):
+    c = checks()
+    if as_json:
+        print(json.dumps({"ok": all(x["state"] == OK for x in c), "checks": c}))
+        return 0 if all(x["state"] == OK for x in c) else 1
+
+    mark = {OK: "  ok  ", MISSING: " MISS ", BROKEN: "BROKEN"}
+    print("keypad setup check\n")
+    for x in c:
+        print("[%s] %s" % (mark[x["state"]], x["what"]))
+        print("         %s" % x["detail"])
+        if x["state"] != OK:
+            print("         fix: %s" % x["fix"])
+    bad = [x for x in c if x["state"] != OK]
+    if not bad:
+        print("\nEverything is in place. Press a pad key to try it.")
+        return 0
+    print("\n%d thing(s) to fix. Run:  %s" % (len(bad), os.path.abspath(__file__)))
+    return 1
+
+
+def do_root_steps():
+    """Install the udev rule and uinput. Everything is printed first.
+
+    One sudo invocation, a fixed command list, no shell string, nothing read
+    from a temporary file. Refuses to guess if sudo is not available.
+    """
+    need_rule = not os.path.exists(UDEV_RULE)
+    need_modconf = not os.path.exists(MODULES_CONF)
+    need_modprobe = not os.path.exists(UINPUT)
+
+    if not (need_rule or need_modconf or need_modprobe):
+        print("  system setup already in place, leaving it alone")
+        return True
+
+    script = []
+    if need_rule:
+        script.append("install -m 644 %s %s" % (
+            os.path.join(SHARE, "70-omarchy-keypad.rules"), UDEV_RULE))
+    if need_modconf:
+        script.append("printf 'uinput\\n' > %s" % MODULES_CONF)
+    script.append("modprobe uinput")
+    script.append("udevadm control --reload")
+    script.append("udevadm trigger")
+
+    print("\nThese steps need root. They will run now, exactly as printed:\n")
+    for line in script:
+        print("    sudo " + line)
+
+    if not shutil.which("sudo"):
+        print("\n  sudo is not installed. Run the lines above as root yourself.")
+        return False
+
+    print()
+    r = subprocess.run(["sudo", "sh", "-c", " && ".join(script)])
+    if r.returncode != 0:
+        print("\n  those steps did not complete (exit %d)." % r.returncode)
+        print("  Nothing else was changed. Run them yourself and try again.")
+        return False
+    return True
+
+
+def do_user_steps():
+    ok = True
+
+    if os.path.exists(CONFIG):
+        print("  bindings file already there, leaving it alone")
+    else:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        shutil.copy(os.path.join(SHARE, "config.default.json"), CONFIG)
+        print("  created %s" % CONFIG)
+
+    if os.path.exists(UNIT):
+        print("  service file already there, leaving it alone")
+    else:
+        os.makedirs(UNIT_DIR, exist_ok=True)
+        shutil.copy(os.path.join(SHARE, "omarchy-keypad.service"), UNIT)
+        print("  installed %s" % UNIT)
+
+    r = run(["systemctl", "--user", "daemon-reload"])
+    if r.returncode != 0:
+        print("  could not reload systemd --user: %s" % r.stderr.strip())
+        ok = False
+    r = run(["systemctl", "--user", "enable", "--now", "omarchy-keypad.service"])
+    if r.returncode != 0:
+        print("  could not start the service: %s" % r.stderr.strip())
+        ok = False
+    else:
+        print("  service enabled and started")
+    return ok
+
+
+def setup():
+    print("Setting up the keypad.\n")
+    print("User steps:")
+    user_ok = do_user_steps()
+    root_ok = do_root_steps()
+    if root_ok:
+        # the rule only reaches an already-attached pad after a re-trigger,
+        # which do_root_steps just did; give udev a moment before re-checking
+        run(["udevadm", "settle"])
+        run(["systemctl", "--user", "restart", "omarchy-keypad.service"])
+    print()
+    rc = report()
+    if rc == 0:
+        return 0
+    if not (user_ok and root_ok):
+        return 1
+    print("\nIf the pad is paired over Bluetooth, switch it off and on once so")
+    print("it re-attaches under the new rule, then run --check again.")
+    return 1
+
+
+def main(argv):
+    args = argv[1:]
+    if "--help" in args or "-h" in args:
+        print(__doc__)
+        return 0
+    if "--check" in args:
+        return report(as_json="--json" in args)
+    if args:
+        print("unknown option: %s" % " ".join(args))
+        print(__doc__)
+        return 2
+    return setup()
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

@@ -31,21 +31,66 @@ hotkeys without breaking typing. The daemon therefore grabs the pad
 
 ## Install
 
+Two commands. The second one is the whole setup.
+
 ```bash
 omarchy plugin add https://github.com/mfilm77/omarchy-keypad --enable --yes
-sudo cp share/70-omarchy-keypad.rules /etc/udev/rules.d/
-echo uinput | sudo tee /etc/modules-load.d/omarchy-keypad.conf && sudo modprobe uinput
-sudo udevadm control --reload && sudo udevadm trigger
-mkdir -p ~/.config/omarchy-keypad && cp share/config.default.json ~/.config/omarchy-keypad/config.json
-mkdir -p ~/.config/systemd/user && cp share/omarchy-keypad.service ~/.config/systemd/user/
-systemctl --user daemon-reload && systemctl --user enable --now omarchy-keypad.service
+~/.config/omarchy/plugins/io.github.mfilm77.keypad/bin/keypad-setup
 ```
 
-The udev rule is the only step that needs root, and it grants access to this one
-USB id rather than adding you to the `input` group, which would mean read access
-to every keyboard on the machine. The same rule grants `/dev/uinput`, which is
-where shortcut bindings are typed from; the `uinput` module has to be loaded for
-that node to exist with the right permissions.
+`keypad-setup` creates your bindings file, installs and starts the background
+service, and — after printing them — runs the three steps that need root. It
+asks for `sudo` **once**. It never overwrites a bindings file, a service file or
+a udev rule you already have: anything already in place is reported and left
+alone, so running it twice is safe.
+
+Then press a key on the pad.
+
+### Checking, later
+
+```bash
+keypad-setup --check
+```
+
+lists every prerequisite and what to do about each one:
+
+```
+[  ok  ] udev rule (lets you read the pad without being root)
+[  ok  ] uinput (how the pad's shortcuts are typed)
+[  ok  ] your bindings file
+[  ok  ] the background service that reads the pad
+[  ok  ] the keypad itself
+         found at /dev/input/event23
+```
+
+The panel shows the same thing in plain words when something is missing, so a
+pad that is not working tells you why rather than leaving you to guess.
+
+### What needs root, and why
+
+Reading a keyboard is a privileged act. The udev rule grants access to **this
+one pad** rather than adding you to the `input` group, which would mean read
+access to every keyboard on the machine — a keylogger for anything running as
+you. The same rule grants `/dev/uinput`, which is where shortcut bindings are
+typed from, and the `uinput` module has to be loaded for that node to exist.
+
+Those three steps are printed in full before they run, and they run in a single
+`sudo` invocation you can see. Nothing is escalated silently. If you would
+rather do it yourself, `keypad-setup --check` names each file, and the commands
+are:
+
+```bash
+sudo install -m 644 share/70-omarchy-keypad.rules /etc/udev/rules.d/70-omarchy-keypad.rules
+printf 'uinput\n' | sudo tee /etc/modules-load.d/omarchy-keypad.conf
+sudo modprobe uinput && sudo udevadm control --reload && sudo udevadm trigger
+```
+
+### If the pad is paired over Bluetooth
+
+A rule installed while the pad is already connected reaches it on the next
+re-trigger, which `keypad-setup` does for you. If the pad still is not read,
+switch it off and on once so it re-attaches under the new rule, then
+`keypad-setup --check`.
 
 ## Requirements
 
