@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.mfilm77.keypad",
   "name": "Keypad",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "mfilm",
   "license": "MIT",
   "description": "Turn a 12-key, 2-knob macropad into a programmable control surface — built for the Sikai pad (USB 1189:8840), over USB or Bluetooth. Draws your pad, and clicking a key or a knob assigns it a command. Layers are done in software, because these pads report the same keycodes on every hardware layer and say nothing when their layer button is pressed.",
