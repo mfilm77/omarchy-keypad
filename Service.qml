@@ -34,6 +34,12 @@ Item {
   readonly property bool usbConnected: connections.some(function (d) { return d.bus === "usb" })
   readonly property bool bluetoothConnected: connections.some(function (d) { return d.bus === "bluetooth" })
   readonly property bool padConnected: connections.length > 0
+  // Nodes the daemon can see are our pad but is not allowed to open. This is a
+  // missing udev rule, NOT a missing pad, and the panel must not confuse the
+  // two: telling someone to plug in a pad that is already plugged in is the
+  // one piece of advice that cannot help them.
+  property var deniedNodes: []
+  readonly property bool padUnreadable: deniedNodes.length > 0 && !padConnected
   // Battery of the Bluetooth pad, -1 when unknown or not on Bluetooth.
   readonly property int bluetoothBattery: {
     for (var i = 0; i < connections.length; i++) {
@@ -143,10 +149,12 @@ Item {
         root.activeLayer = s.layer || 0
         root.activeLayerName = s.name || ""
         root.connections = s.devices || []
+        root.deniedNodes = s.denied || []
         root.daemonRunning = true
       } catch (e) {
         root.daemonRunning = false
         root.connections = []
+        root.deniedNodes = []
       }
     }
   }

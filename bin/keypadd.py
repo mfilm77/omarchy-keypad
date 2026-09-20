@@ -119,18 +119,30 @@ def matches(info, spec):
 
 
 def find_devices(specs):
-    """All event nodes matching any spec that actually report the pad keys.
+    """Event nodes matching any spec, split by what we are allowed to see.
+
+    Returns (found, denied):
+      found  — [(node, bus, uniq)] nodes that actually report the pad keys
+      denied — [node] nodes that match the pad but cannot be opened at all
 
     A pad may present a keyboard and a mouse interface on the same id (USB),
     or one combined node (Bluetooth); only nodes that emit the keys count.
+
+    `denied` exists because a missing udev rule is not the same thing as a
+    missing pad. Folding the two together told users with a perfectly good
+    pad to "plug it in or pair it", which is the one thing that would not
+    help them.
     """
-    found = []
+    found, denied = [], []
     for info in list_input_devices():
         if any(matches(info, spec) for spec in specs):
-            if device_has_keys(info["node"]):
+            has_keys = device_has_keys(info["node"])
+            if has_keys is None:
+                denied.append(info["node"])
+            elif has_keys:
                 bus = BUS_NAMES.get(info["bustype"], info["bustype"] or "unknown")
                 found.append((info["node"], bus, info["uniq"]))
-    return found
+    return found, denied
 
 
 def bluetooth_battery(address):
@@ -162,9 +174,18 @@ def bluetooth_battery(address):
 
 
 def device_has_keys(node):
+    """True if the node reports the pad keys, False if it does not,
+    None if we are not allowed to look.
+
+    The None case is the whole point: without the udev rule the open fails
+    with EACCES, and answering False there is a lie — it says "this device
+    has no keys" about a device we never managed to ask.
+    """
     try:
         fd = os.open(node, os.O_RDONLY | os.O_NONBLOCK)
-    except OSError:
+    except OSError as e:
+        if e.errno in (errno.EACCES, errno.EPERM):
+            return None
         return False
     try:
         buf = bytearray(96)
@@ -202,7 +223,7 @@ def device_specs(config):
     return [s for s in specs if isinstance(s, dict)]
 
 
-def write_state(layer_index, layers, devices=None, battery=None):
+def write_state(layer_index, layers, devices=None, battery=None, denied=None):
     """Publish the current layer and which pads are held, so the bar widget
     can show the layer and the panel can light a USB or Bluetooth indicator.
 
@@ -218,6 +239,10 @@ def write_state(layer_index, layers, devices=None, battery=None):
             {"node": n, "bus": b, "battery": (battery or {}).get(n)}
             for n, b in sorted((devices or {}).items())
         ],
+        # Nodes that are this pad but could not be opened. Non-empty means the
+        # udev rule is missing, NOT that the pad is unplugged — the panel says
+        # something different for each.
+        "denied": sorted(denied or []),
     }
     tmp = STATE + ".tmp"
     try:
@@ -430,6 +455,8 @@ class Daemon:
         self.buses = {}        # node -> "usb" | "bluetooth", for the indicators
         self.addresses = {}    # node -> Bluetooth address, for the battery
         self.battery = {}      # node -> percent, Bluetooth pads only
+        self.denied = []       # nodes that are our pad but cannot be opened
+        self.denied_logged = set()   # so a missing rule is not logged every 2 s
         self.last_battery = 0.0
         self.last_scan = 0.0
         self.seen_axes = set()
@@ -452,7 +479,21 @@ class Daemon:
         """Grab every matching pad not already held. Called on a 2 s cadence
         so a pad plugged in or paired later just starts working."""
         self.last_scan = time.time()
-        for node, bus, uniq in find_devices(device_specs(self.config)):
+        found, denied = find_devices(device_specs(self.config))
+
+        # A pad we can see but not open is a setup problem, not a missing pad.
+        # Publish it so the panel can say so, and log it once per node rather
+        # than every 2 s for as long as the rule stays missing.
+        if denied != self.denied:
+            self.denied = denied
+            for node in denied:
+                if node not in self.denied_logged:
+                    self.denied_logged.add(node)
+                    log("no permission to read %s — the udev rule is not "
+                        "installed. Run: keypad-setup" % node)
+            self.publish()
+
+        for node, bus, uniq in found:
             if node in self.fds:
                 continue
             try:
@@ -478,7 +519,7 @@ class Daemon:
             self.publish()
 
     def publish(self):
-        write_state(self.layer, self.layers(), self.buses, self.battery)
+        write_state(self.layer, self.layers(), self.buses, self.battery, self.denied)
 
     def poll_battery(self):
         """Once a minute, and on connect. bluetoothctl takes a moment, which

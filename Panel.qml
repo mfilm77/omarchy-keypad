@@ -340,7 +340,12 @@ PanelWindow {
           Text {
             text: {
               if (!root.service || !root.service.daemonRunning)
-                return "Not running — the pad is not being read"
+                return "Not set up yet — run keypad-setup in a terminal"
+              // A pad we can see but not open is a missing udev rule. Saying
+              // "plug it in" here sends people to fix the one thing that is
+              // already right.
+              if (root.service.padUnreadable)
+                return "Cannot read the pad — run keypad-setup in a terminal"
               if (!root.service.padConnected)
                 return "No pad connected — plug it in or pair it"
               var over = []
