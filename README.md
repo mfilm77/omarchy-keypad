@@ -4,9 +4,10 @@ Turns a cheap USB macropad into a programmable control surface on Omarchy.
 
 ![The keypad editor — the pad drawn on screen, click a key or a knob to bind it](docs/panel.png)
 
-Built for a 12-key, 2-knob pad (USB `1189:8840`, sold as a "Sikai" pad), but the
-device identity is in the config so any pad that reports plain keycodes will
-work. The pad is matched on any bus: plugged in over USB, or paired over
+Built for a 12-key, 2-knob macropad (USB `1189:8840`) — sold under the **Sikai**
+name, and by plenty of sellers unbranded as a "12 key macro keyboard with two
+knobs". The device identity is in the config, so any pad that reports plain
+keycodes will work. The pad is matched on any bus: plugged in over USB, or paired over
 Bluetooth, where it shows up as `MINI_KEYBOARD` with a borrowed Apple id
 (`05ac:022c`). Both can be live at once; each is grabbed.
 
@@ -130,6 +131,26 @@ written by keycode (Omarchy binds workspaces as `code:10`…) fire exactly as th
 do from the physical keyboard, and app shortcuts arrive as ordinary key events.
 That is why uinput rather than `wtype`: a `wtype` keymap carries its own
 keycodes and misses every `code:` bind.
+
+## Would you want a keypad built for this?
+
+This plugin exists because the hardware got in the way. The pad is fine, but its
+layers are a fiction on Linux, its keys type letters into whatever has focus, and
+the only tool that can change any of that runs on Windows. All of that is worked
+around here rather than fixed.
+
+It could be fixed. If enough people want one, I would look at making a keypad
+properly — designed for this instead of adapted to it: different colours,
+different knobs, and a key layout chosen rather than inherited.
+
+**Nothing is for sale and there is nothing to pre-order.** This is a straight
+question about whether the interest exists, and the answer decides whether it
+goes any further.
+
+If you would want one, say so here — **[Would you want a keypad built properly
+for this?](https://github.com/mfilm77/omarchy-keypad/issues/1)** — what you would
+use it for, how many keys and knobs you would actually want, and what it should
+look like. A 👍 counts if you have nothing to add. Numbers are what decide it.
 
 ## Files
 

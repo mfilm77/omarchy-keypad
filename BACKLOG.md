@@ -21,8 +21,32 @@ Commit locally as you go; push only when cutting a release.
   functions confirmed through `hyprctl eval` (side-effect free, unlike
   dispatching them).
 
-Before the release: run both on a real pad, then push once and re-verify the
+- **3 — name the hardware, and ask about future keypads.** The marketplace card
+  showed only "a cheap USB macropad", so nobody browsing could tell which pad it
+  drives. The manifest description now names the Sikai pad and its USB id, and
+  the README intro carries the unbranded search terms too, for the case where
+  somebody buys one of these pads later and goes looking for Linux support.
+  Added a README section asking whether people would want a keypad built for
+  this properly — deliberately an interest check, with nothing for sale and
+  nothing to pre-order.
+
+Before the release: run 1 and 2 on a real pad, then push once and re-verify the
 listing.
+
+---
+
+## Not in the repo — chase separately
+
+- **The `Input` tag was never applied.** The submission suggested it; the
+  marketplace registry lists us as `hyprland, quickshell, system` only, so the
+  plugin does not appear when browsing for input/keyboard hardware. Tags live in
+  the marketplace registry, not in our manifest, so this needs a request to the
+  marketplace rather than a commit here.
+- **Pinned interest thread — LIVE.** [#1 "Would you want a keypad built properly
+  for this?"](https://github.com/mfilm77/omarchy-keypad/issues/1), created and
+  pinned 2026-09-12. The README links straight to it. Expect it quiet until the
+  release push puts the card in front of people again — early silence is not the
+  answer. Check reactions and comments when cutting the release.
 
 ---
 
