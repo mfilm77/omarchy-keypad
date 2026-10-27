@@ -115,21 +115,22 @@ Item {
 
   // Makes a layer the pad's LIVE one — what knob2 cycles from now on — rather
   // than only the one being edited. Written to the same runtime directory the
-  // daemon already publishes its own state to, atomically (temp file, then
-  // `mv`), so the daemon never reads a half-written index. Polled by the
-  // daemon rather than sent as a signal: a signal cannot carry which layer.
+  // daemon already publishes its own state to, the same way `configFile`
+  // below writes config.json: FileView.setText(), not a shelled-out Process.
+  // (A Process was tried first and silently never wrote the file in the real
+  // shell — no error anywhere, Quickshell's own `Process` type is a
+  // PostReloadHook and this plugin had just been hot-reloaded. FileView's
+  // write path is the one already proven, every time a binding is saved or
+  // a layer renamed, to survive that reload; it also prints its own errors
+  // by default, so a future failure here will not be silent again.)
   function requestLayer(layerIndex) {
     if (layerIndex < 0 || layerIndex >= layers.length) return
-    layerRequestProc.layerArg = String(layerIndex)
-    layerRequestProc.running = true
+    layerRequestFile.setText(String(layerIndex))
   }
 
-  Process {
-    id: layerRequestProc
-    property string layerArg: "0"
-    command: ["sh", "-c",
-      "printf '%s' \"$1\" > \"$2.tmp\" && mv \"$2.tmp\" \"$2\"",
-      "sh", layerArg, root.layerRequestPath]
+  FileView {
+    id: layerRequestFile
+    path: root.layerRequestPath
   }
 
   function save() {
