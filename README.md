@@ -167,6 +167,13 @@ virtual keyboard rather than shelled out.
 
 To rename the layer you are on, type in the *Rename* field next to the tabs.
 
+Clicking a layer tab also makes it the pad's **live** layer — the one knob2 cycles from — not
+only the one you are editing, so the bar widget and the pad agree with what the panel is showing
+the moment you close it. The click writes the index to a small file in `XDG_RUNTIME_DIR` next to
+the daemon's own state file; the daemon picks it up on its next pass through the main loop
+(well under a second), the same way everything else here favours a plain file the daemon polls
+over anything that needs the daemon to already know what you want to tell it.
+
 ### How shortcut recording works
 
 Hyprland runs its binds before a key reaches any window, and a consumed key

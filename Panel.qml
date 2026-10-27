@@ -456,7 +456,14 @@ PanelWindow {
               anchors.fill: parent
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
-              onClicked: { root.layerIndex = index; root.selected = "" }
+              // Editing a layer and pressing it with the pad used to be two
+              // different things — click tab 2, close the panel, the pad was
+              // still on whatever knob2 had left it on. A click now does both.
+              onClicked: {
+                root.layerIndex = index
+                root.selected = ""
+                if (root.service) root.service.requestLayer(index)
+              }
             }
           }
         }

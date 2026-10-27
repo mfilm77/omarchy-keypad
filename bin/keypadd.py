@@ -60,6 +60,13 @@ BINDIR = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(
     os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "omarchy-keypad.state"
 )
+# The layer the panel wants live, written here by a tab click (see Service.qml
+# `requestLayer`) the same way the daemon publishes STATE: a plain text file,
+# replaced atomically. Polled rather than signalled so it can carry an index,
+# and polling costs nothing on a 0.5-2 s cadence the main loop already has.
+LAYER_REQUEST = os.path.join(
+    os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "omarchy-keypad.layer-request"
+)
 
 # The controls this pad exposes, by evdev keycode. Names match what the panel
 # shows and what the config file uses, so a binding is readable on sight.
@@ -470,6 +477,14 @@ class Daemon:
         self.held = {}
         self.running = True
         self.keyboard = VirtualKeyboard()
+        # A request file already sitting there at startup is from a previous
+        # run, not a fresh click — its mtime is remembered as already-handled
+        # so the pad does not jump to whatever layer the panel last touched
+        # before the daemon restarted.
+        try:
+            self.last_request_mtime = os.stat(LAYER_REQUEST).st_mtime
+        except OSError:
+            self.last_request_mtime = 0.0
 
     def layers(self):
         return self.config.get("layers") or []
@@ -633,6 +648,33 @@ class Daemon:
             if self.keyboard.press(codes):
                 self.held[control] = codes
 
+    def poll_layer_request(self):
+        """Pick up a layer the panel asked for by clicking a tab.
+
+        Garbage, a missing file, a stale mtime, or an index that does not fit
+        the current config are all ignored rather than raised — a malformed
+        request must cost the panel its click, never the daemon its grab.
+        """
+        try:
+            mtime = os.stat(LAYER_REQUEST).st_mtime
+        except OSError:
+            return
+        if mtime <= self.last_request_mtime:
+            return
+        self.last_request_mtime = mtime
+        try:
+            with open(LAYER_REQUEST) as f:
+                idx = int(f.read().strip())
+        except (OSError, ValueError):
+            return
+        layers = self.layers()
+        if not layers or not (0 <= idx < len(layers)):
+            return
+        if idx != self.layer:
+            self.layer = idx
+            self.publish()
+            log("layer -> %d (panel)" % self.layer)
+
     def reload(self):
         self.config = load_config()
         layers = self.layers()
@@ -654,6 +696,10 @@ class Daemon:
         # cannot open yet it is retried on first use.
         self.keyboard.open()
         while self.running:
+            # Checked every lap regardless of whether a pad is attached: the
+            # layer is daemon state the panel can change on its own, not
+            # something that needs a key pressed first.
+            self.poll_layer_request()
             if not self.fds or time.time() - self.last_scan > 2.0:
                 self.open_devices()
                 if not self.fds:

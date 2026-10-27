@@ -21,6 +21,7 @@ Item {
   readonly property string configDir: Quickshell.env("HOME") + "/.config/omarchy-keypad"
   readonly property string configPath: configDir + "/config.json"
   readonly property string statePath: Quickshell.env("XDG_RUNTIME_DIR") + "/omarchy-keypad.state"
+  readonly property string layerRequestPath: Quickshell.env("XDG_RUNTIME_DIR") + "/omarchy-keypad.layer-request"
 
   // The whole config, as the file has it. Written back wholesale on save.
   property var config: ({ device: { vendor: "1189", product: "8840" }, layers: [] })
@@ -110,6 +111,25 @@ Item {
     next.layers[layerIndex].name = name
     config = next
     save()
+  }
+
+  // Makes a layer the pad's LIVE one — what knob2 cycles from now on — rather
+  // than only the one being edited. Written to the same runtime directory the
+  // daemon already publishes its own state to, atomically (temp file, then
+  // `mv`), so the daemon never reads a half-written index. Polled by the
+  // daemon rather than sent as a signal: a signal cannot carry which layer.
+  function requestLayer(layerIndex) {
+    if (layerIndex < 0 || layerIndex >= layers.length) return
+    layerRequestProc.layerArg = String(layerIndex)
+    layerRequestProc.running = true
+  }
+
+  Process {
+    id: layerRequestProc
+    property string layerArg: "0"
+    command: ["sh", "-c",
+      "printf '%s' \"$1\" > \"$2.tmp\" && mv \"$2.tmp\" \"$2\"",
+      "sh", layerArg, root.layerRequestPath]
   }
 
   function save() {
